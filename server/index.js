@@ -29,7 +29,7 @@ app.get('/', async (req, res) => {
 // 🔐 Login route
 app.post('/login', async (req, res) => {
     
-  const { email, password } = req.body;
+  const { email, password,isAdmin,firstName,lastName } = req.body;
 
   if (!email || !password)
     return res.status(400).json({ error: 'Email and password are required' });
@@ -40,7 +40,8 @@ app.post('/login', async (req, res) => {
     const result = await pool
       .request()
       .input('email', sql.NVarChar, email)
-      .query('SELECT email, loginpassword FROM Employee WHERE email = @email');
+      .query(`SELECT email, loginpassword, isAdmin AS isAdmin, firstName AS firstName, lastName AS lastName FROM Employee WHERE email = @email
+`);
 
     if (result.recordset.length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
@@ -53,7 +54,7 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    res.json({ message: 'Login successful', email: user.email });
+    res.json({ message: 'Login successful', email: user.email, isAdmin: user.isAdmin,firstName : user.firstName, lastName: user.lastName });
   } catch (err) {
     console.error('Login error:', err.message);
     res.status(500).json({ error: 'Server error during login' });
