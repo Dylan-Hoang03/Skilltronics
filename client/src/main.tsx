@@ -6,6 +6,8 @@ import Form from "./forms.tsx";
 import Landing from "./landing";  
 import Landingnotadmin from "./landingnotadmin.tsx";  
 import Adduser from "./adduser.tsx";  
+import Addquestion from "./addquestion.tsx";  
+
 import Deleteuser from "./deleteuser.tsx";  
 import Updatepassword from "./newpassword.tsx";  
 
@@ -34,6 +36,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           element={
             <RequireAdmin>
               <Adduser />
+            </RequireAdmin>
+          }
+        />
+          <Route
+          path="/addquestion"
+          element={
+            <RequireAdmin>
+              <Addquestion />
             </RequireAdmin>
           }
         />

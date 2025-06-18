@@ -55,6 +55,9 @@ if (response.ok) {
     navigate("/landingnotadmin");
   }
 }
+else{
+  alert("Wrong credentials")
+}
 
   } catch (error) {
     console.error("Login error:", error);

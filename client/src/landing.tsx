@@ -11,6 +11,11 @@ function Landing() {
   navigate("/adduser")  
 }
 
+    const handleSubmitAddExam = async (event: React.MouseEvent<HTMLButtonElement>) => {
+  event.preventDefault();
+  navigate("/addquestion")  
+}
+
   const handleDeleteUser = async (event: React.MouseEvent<HTMLButtonElement>) => {
   event.preventDefault();
   navigate("/deleteuser")
@@ -47,6 +52,7 @@ function Landing() {
          
          <button
           type="submit"
+          onClick = {handleSubmitAddExam}
             className="rounded-lg bg-slate-800 py-3.5 px-6 border border-transparent text-center text-base text-white transition-all shadow hover:shadow-lg focus:bg-slate-700 focus:shadow-none active:bg-slate-700 hover:bg-slate-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
 
         >
