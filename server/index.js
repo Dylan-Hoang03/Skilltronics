@@ -2,9 +2,23 @@ import express from 'express';
 import { sql, pool, poolConnect } from './db.js';
 import cors from 'cors'
 import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+import dotenv from 'dotenv'
+dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.post('generateToken', (req,res) => {
+
+const secretkey = process.env.JWTSECRET;
+
+
+
+
+
+})
+
 
 app.get('/', async (req, res) => {
   try {
@@ -81,13 +95,50 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    res.json({ message: 'Login successful', email: user.email, isAdmin: user.isAdmin,firstName : user.firstName, lastName: user.lastName });
+    const payload = {
+  sub: user.email,        // “subject” of the token
+  isAdmin: user.isAdmin,
+  firstName: user.firstName,
+  lastName: user.lastName,
+};
+
+const expires = process.env.JWT_EXPIRES || '1h';   // default to 1 hour
+
+const token = jwt.sign(payload, process.env.JWT_GIGASECRET, {
+  expiresIn: expires
+});
+
+res.json({
+  message: 'Login successful',
+  token,                     
+  user: {                     
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    isAdmin: user.isAdmin,
+  },
+});
+
   } catch (err) {
     console.error('Login error:', err.message);
     res.status(500).json({ error: 'Server error during login' });
   }
 
 });
+
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.status(401).json({ error: 'Token missing' });
+
+  jwt.verify(token, process.env.JWT_GIGASECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
+    req.user = decoded; 
+  });
+}
+
 app.post('/createaccount', async (req, res) => {
   const { employeeId, firstName, lastName, password, email, isAdmin } = req.body;
 
