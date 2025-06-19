@@ -145,10 +145,8 @@ app.post('/createaccount', async (req, res) => {
   if (!employeeId || !firstName || !lastName || !email || !password) {
     return res.status(400).json({ error: 'Missing fields' });
   }
-
   try {
     await poolConnect;            
-
     const exists = await pool.request()
       .input('email', sql.VarChar, email)
       .query('SELECT 1 FROM Employee WHERE Email = @email');
@@ -161,10 +159,8 @@ app.post('/createaccount', async (req, res) => {
 if (!normalizedEmail.endsWith("@spartronics.com")) {
   return res.status(400).json({ error: "Email must end with @spartronics.com" });
 }
-
     // 3️⃣ hash + insert
     const hash = await bcrypt.hash(password, 10);
-
   await pool.request()
   .input('employeeId', sql.VarChar(20), employeeId)
   .input('firstName',  sql.NVarChar(50), firstName)
@@ -176,14 +172,96 @@ if (!normalizedEmail.endsWith("@spartronics.com")) {
     INSERT INTO Employee (EmployeeID, FirstName, LastName, Email, loginpassword, IsAdmin)
     VALUES (@employeeId, @firstName, @lastName, @email, @hash, @admin)
   `);
-
-
     return res.json({ firstName, normalizedEmail, lastName });           
   } catch (err) {
     console.error('Create-account error:', err.message);
     return res.status(500).json({ error: 'Server error during account creation' });
   }
 });
+
+// POST  /createquestion
+app.post('/createquestion', async (req, res) => {
+  const { courseTitle,courseBlurb, questionText, options, correct } = req.body;
+  const labels = ['A', 'B', 'C', 'D', 'E'];
+
+  // Validation
+  if (
+    !courseTitle || courseBlurb ||
+    !questionText ||
+    !Array.isArray(options) ||
+    options.length !== 5 ||
+    !labels.includes(correct)
+  ) {
+    return res.status(400).json({ error: 'Missing or invalid fields' });
+  }
+
+  let tx;
+  try {
+    await poolConnect;
+    tx = new sql.Transaction(pool);
+    await tx.begin();
+
+    // Get or create Course
+    const courseReq = new sql.Request(tx).input('title', sql.NVarChar(100), courseTitle);
+    let { recordset } = await courseReq.query(
+      'SELECT CourseID FROM Course WHERE Title = @title'
+    );
+    let courseId;
+    if (recordset.length) {
+      courseId = recordset[0].CourseID;
+    } else {
+      ({ recordset } = await courseReq.query(
+        'INSERT INTO Course (Title) OUTPUT INSERTED.CourseID VALUES (@title)'
+      ));
+      courseId = recordset[0].CourseID;
+    }
+
+    // Get next QuestionNumber
+    ({ recordset } = await new sql.Request(tx)
+      .input('cid', sql.Int, courseId)
+      .query('SELECT ISNULL(MAX(QuestionNumber), 0) + 1 AS NextQ FROM Question WHERE CourseID = @cid'));
+    const questionNumber = recordset[0].NextQ;
+
+    // Insert Question
+    ({ recordset } = await new sql.Request(tx)
+      .input('cid',   sql.Int, courseId)
+      .input('qtxt',  sql.NVarChar(sql.MAX), questionText)
+      .input('corr',  sql.Char(1), correct)
+      .input('qnum',  sql.Int, questionNumber)
+      .query(`
+        INSERT INTO Question
+          (CourseID, QuestionText, correctAnswer, QuestionNumber)
+        OUTPUT INSERTED.QuestionID
+        VALUES (@cid, @qtxt, @corr, @qnum)
+      `));
+    const questionId = recordset[0].QuestionID;
+
+    // Insert five AnswerDisplay rows (auto-ID)
+    for (let i = 0; i < 5; i++) {
+      await new sql.Request(tx)
+        .input('qid',   sql.Int, questionId)
+        .input('label', sql.Char(1), labels[i])
+        .input('ans',   sql.NVarChar(sql.MAX), options[i])
+        .query(`
+          INSERT INTO AnswerDisplay
+            (QuestionID, optionChoice, answerText)
+          VALUES (@qid, @label, @ans)
+        `);
+    }
+
+    await tx.commit();
+    return res.json({
+      message: 'Question and answers saved',
+      courseId,
+      questionId,
+    });
+  } catch (err) {
+    if (tx) await tx.rollback();
+    console.error('Create-question error:', err.message);
+    return res.status(500).json({ error: 'Server error during question creation' });
+  }
+});
+
 
 
 
