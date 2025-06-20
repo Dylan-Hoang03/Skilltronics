@@ -11,7 +11,10 @@ import Addquestion from "./addquestion.tsx";
 import Deleteuser from "./deleteuser.tsx";  
 import Updatepassword from "./newpassword.tsx";  
 
-import RequireAdmin from "./requireadmin.tsx";   // ← NEW
+import RequireAdmin from "./requireadmin.tsx";
+import Taketest from "./taketest.tsx";
+import FullTestPage from "./fulltestpage.tsx";
+
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -21,6 +24,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         {/* public routes */}
         <Route path="/" element={<Form />} />
         <Route path="/landingnotadmin" element={<Landingnotadmin />} />
+        <Route path="/taketest" element={<Taketest/>} />
+        <Route path="/test/:courseId" element={<FullTestPage />} />
+         <Route path="/newpassword" element={<Updatepassword />}/>
 
         {/* protected admin routes */}
         <Route
@@ -55,14 +61,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             </RequireAdmin>
           }
         />
-        <Route
-          path="/newpassword"
-          element={
-            <RequireAdmin>
-              <Updatepassword />
-            </RequireAdmin>
-          }
-        />
+       
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

@@ -33,7 +33,6 @@ export default function AddQuestion() {
       return;
     }
 
-    // --- POST to backend (placeholder URL) ---
     try {
       const token = localStorage.getItem("token");
       const res = await fetch("http://localhost:5000/createquestion", {
@@ -46,8 +45,8 @@ export default function AddQuestion() {
           courseTitle : courseTitle.trim(),
           courseBlurb : courseBlurb.trim(),
           questionText : questionText.trim(),
-          options:options.map((opt) => opt.trim()) ,      // ["ITs true", "Its false", ...]
-          correct,      // "A"
+          options:options.map((opt) => opt.trim()) ,   
+          correct,     
         }),
       });
 
@@ -57,11 +56,11 @@ export default function AddQuestion() {
       }
 
       alert("Question saved!");
-      // Ask if user wants to add another question
+  
       if (window.confirm("Add another question to this course?")) {
-        clearForm();                  // stay on page, blank fields
+        clearForm();                 
       } else {
-        navigate("/landing");         // or wherever
+        navigate("/landing");         
       }
     } catch (err: any) {
       console.error(err);
@@ -82,16 +81,6 @@ export default function AddQuestion() {
             className="mt-2 p-2 border rounded w-full"
             value={courseTitle}
             onChange={(e) => setCourseTitle(e.target.value)}
-            required
-          />
-        </label>
-
-         <label className="block">
-          <span className="font-medium">Course Description</span>
-          <input
-            className="mt-2 p-2 border rounded w-full"
-            value={courseBlurb}
-            onChange={(e) => setCourseBlurb(e.target.value)}
             required
           />
         </label>
