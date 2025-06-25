@@ -1,29 +1,46 @@
 import { useState } from "react";
-import logo from "./assets/logo.png"; // adjust the path if needed
+import logo from "./assets/logo.png";
 import { useNavigate } from "react-router-dom";
 
 export default function ChangePassword() {
-
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const res = await fetch("http://localhost:5000/changepassword", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ password, confirmPassword }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert("Password changed successfully!");
+        navigate("/");
+      } else {
+        alert(data.error || "Something went wrong.");
+      }
+    } catch (err) {
+      console.error("⚠️ Network or server error:", err);
+      alert("Request failed.");
+    }
+  };
 
   return (
     <div className="relative h-screen flex items-center justify-center bg-gradient-to-tr from-blue-600 to-white">
       <img src={logo} alt="Logo" className="absolute top-4 right-4 h-8 w-auto" />
       <h1 className="absolute top-4 left-4 text-2xl font-bold text-blue-800">SKILLTRONICS</h1>
 
-      <form  className="bg-gray-100 p-8 rounded-xl shadow-xl w-full max-w-2xl">
-        {/* Grid layout for inputs */}
+      <form onSubmit={handleSubmit} className="bg-gray-100 p-8 rounded-xl shadow-xl w-full max-w-2xl">
         <div className="grid grid-cols-2 gap-6 mb-6">
-        
-
-
-
-
-
-          {/* Password */}
           <label className="block font-medium col-span-1">
             Password
             <input
@@ -35,7 +52,6 @@ export default function ChangePassword() {
             />
           </label>
 
-          {/* Confirm Password */}
           <label className="block font-medium col-span-1">
             Confirm Password
             <input
@@ -48,9 +64,7 @@ export default function ChangePassword() {
           </label>
         </div>
 
-        {/* Additional Controls */}
         <div className="flex items-center justify-between mb-6">
-          {/* Show password toggle */}
           <button
             type="button"
             onClick={() => setShowPassword((prev) => !prev)}
@@ -58,8 +72,6 @@ export default function ChangePassword() {
           >
             {showPassword ? "Hide Password" : "Show Password"}
           </button>
-
-         
         </div>
 
         <button

@@ -6,8 +6,12 @@ interface Course {
   Title: string;
 }
 
+interface CourseWithStatus extends Course {
+  canTakeTest: boolean;
+}
+
 export default function Taketest() {
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<CourseWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -21,7 +25,22 @@ export default function Taketest() {
         });
         if (!res.ok) throw new Error("Failed to load courses");
         const data: Course[] = await res.json();
-        setCourses(data);
+
+        const withStatus = await Promise.all(
+          data.map(async (course) => {
+            const progRes = await fetch(
+              `http://localhost:5000/progress/status?courseID=${course.CourseID}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const progData = await progRes.json();
+            return {
+              ...course,
+              canTakeTest: progData.canTakeTest ?? false,
+            };
+          })
+        );
+
+        setCourses(withStatus);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -32,7 +51,7 @@ export default function Taketest() {
   }, []);
 
   if (loading) return <p className="p-4">Loading…</p>;
-  if (error)   return <p className="p-4 text-red-600">{error}</p>;
+  if (error) return <p className="p-4 text-red-600">{error}</p>;
 
   return (
     <div className="p-6 space-y-4 max-w-2xl mx-auto">
@@ -41,10 +60,20 @@ export default function Taketest() {
       {courses.map((c) => (
         <button
           key={c.CourseID}
-          className="block w-full text-left bg-blue-200 hover:bg-blue-300 rounded p-3 mb-2"
-          onClick={() => navigate(`/test/${c.CourseID}`)}  
+          className={`block w-full text-left rounded p-3 mb-2 ${
+            c.canTakeTest
+              ? "bg-blue-200 hover:bg-blue-300"
+              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+          }`}
+          onClick={() => c.canTakeTest && navigate(`/test/${c.CourseID}`)}
+          disabled={!c.canTakeTest}
         >
           {c.Title}
+          {!c.canTakeTest && (
+            <span className="ml-2 text-sm italic text-red-500">
+              (Review lessons first)
+            </span>
+          )}
         </button>
       ))}
     </div>

@@ -21,11 +21,22 @@ function Landing() {
   navigate("/deleteuser")
 
 }
+  const handleCheckUser = async (event: React.MouseEvent<HTMLButtonElement>) => {
+  event.preventDefault();
+  navigate("/checkanswer")
+
+}
+ const handleAddLesson= async (event: React.MouseEvent<HTMLButtonElement>) => {
+  event.preventDefault();
+  navigate("/addlesson")
+
+}
   return (
     <div className="relative h-screen flex items-center justify-center bg-gradient-to-tr from-blue-600 to-white">
       <h1 className="text-4xl font-bold text-white absolute top-4 ">Welcome to Skilltronics (admin)!</h1>
         <button
           type="submit"
+          onClick = {handleCheckUser}
             className="rounded-lg bg-slate-800 py-3.5 px-6 border border-transparent text-center text-base text-white transition-all shadow hover:shadow-lg focus:bg-slate-700 focus:shadow-none active:bg-slate-700 hover:bg-slate-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
 
         >
@@ -57,6 +68,14 @@ function Landing() {
 
         >
           Add Test
+        </button>
+         <button
+          type="submit"
+          onClick = {handleAddLesson}
+            className="rounded-lg bg-slate-800 py-3.5 px-6 border border-transparent text-center text-base text-white transition-all shadow hover:shadow-lg focus:bg-slate-700 focus:shadow-none active:bg-slate-700 hover:bg-slate-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
+
+        >
+          Add Lessons
         </button>
     </div>
 

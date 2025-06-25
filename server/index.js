@@ -8,6 +8,20 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+import stream from 'stream'
+import multer from "multer";
+
+import libre from "libreoffice-convert";
+import path from "path";
+import fs from "fs";
+export async function convertPptxToPdf(buffer) {
+  return new Promise((resolve, reject) => {
+    libre.convert(buffer, ".pdf", undefined, (err, pdfBuffer) => {
+      if (err) return reject(err);
+      resolve(pdfBuffer);
+    });
+  });
+}
 
 app.post('generateToken', (req,res) => {
 
@@ -18,6 +32,61 @@ const secretkey = process.env.JWTSECRET;
 
 
 })
+
+
+
+app.get("/lessons/:id/pdf", async (req, res) => {
+  const id = +req.params.id;
+  if (!Number.isInteger(id)) return res.status(400).end();
+
+  await poolConnect;
+
+  // 1. fetch metadata
+  const r = await pool.request()
+    .input("id", sql.Int, id)
+    .query(`
+      SELECT FileName, MimeType, FileData, PdfData, PdfReady
+      FROM   dbo.Lesson
+      WHERE  LessonID = @id;
+    `);
+  if (!r.recordset.length) return res.status(404).end();
+  const lesson = r.recordset[0];
+
+  // 2. if already cached → stream cached PDF
+  if (lesson.PdfReady) {
+    res.set("Content-Type", "application/pdf");
+    return res.end(lesson.PdfData);
+  }
+
+  // 3. convert (only ppt / pptx)
+  if (!lesson.MimeType.includes("powerpoint")) {
+    return res.status(415).json({ error: "Not a PowerPoint" });
+  }
+
+  try {
+    const pdfBuf = await convertPptxToPdf (lesson.FileData);
+
+    // 4. cache it back to DB (async but no await needed for streaming)
+    pool.request()
+      .input("id", sql.Int, id)
+      .input("pdf", sql.VarBinary(sql.MAX), pdfBuf)
+      .query(`
+        UPDATE dbo.Lesson
+        SET PdfData = @pdf, PdfReady = 1
+        WHERE LessonID = @id;
+      `).catch(console.error);
+
+    // 5. stream to user
+    res.set("Content-Type", "application/pdf");
+    res.end(pdfBuf);
+  } catch (e) {
+  console.error("PDF conversion failed:", e);   // <– full stack here
+  res.status(500).json({                       // expose for debug only
+    error: "Conversion error",
+    details: String(e)                         // <-- send stack to browser
+  });
+}
+});
 
 
 app.get('/', async (req, res) => {
@@ -69,17 +138,19 @@ app.post('/delete', async (req, res) => {
 app.post('/login', async (req, res) => {
     
   const { email, password,isAdmin,firstName,lastName } = req.body;
-
+  
   if (!email || !password)
     return res.status(400).json({ error: 'Email and password are required' });
 
   try {
     await poolConnect;
+      const trueemail = email.toLowerCase().trim()
+
 
     const result = await pool
       .request()
-      .input('email', sql.NVarChar, email)
-      .query(`SELECT email, loginpassword, isAdmin AS isAdmin, firstName AS firstName, lastName AS lastName FROM Employee WHERE email = @email
+      .input('trueemail', sql.NVarChar, trueemail)
+      .query(`SELECT EmployeeID as employeeID,email, loginpassword, isAdmin AS isAdmin, firstName AS firstName, lastName AS lastName FROM Employee WHERE email = @trueemail
 `);
 
     if (result.recordset.length === 0) {
@@ -98,14 +169,14 @@ app.post('/login', async (req, res) => {
   isAdmin: user.isAdmin,
   firstName: user.firstName,
   lastName: user.lastName,
+  employeeID : user.employeeID
 };
 
-const expires = process.env.JWT_EXPIRES || '1h';   // default to 1 hour
+const expires = process.env.JWT_EXPIRES || '168h';   // default to 1 week
 
 const token = jwt.sign(payload, process.env.JWT_SECRET, {
   expiresIn: expires
 });
-console.log("🔑 NEW TOKEN ISSUED:", token.slice(0, 30), "...");  // <-- add
 
 
 res.json({
@@ -116,6 +187,7 @@ res.json({
     firstName: user.firstName,
     lastName: user.lastName,
     isAdmin: user.isAdmin,
+    employeeID :user.employeeID
   },
 });
 
@@ -128,20 +200,18 @@ res.json({
 
 
 export default function authenticateToken(req, res, next) {
-  console.log("🔐 auth MW hit, path:", req.path);
 
   const auth = req.headers['authorization'];
   if (!auth) {
-    console.warn("🛑 No Authorization header");
+    console.warn(" No Authorization header");
     return res.status(401).json({ error: "Missing token" });
   }
 
   const token = auth.split(' ')[1];
-  console.log("🔑 Token snippet:", token?.slice(0, 12), "...");
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
-      console.warn("🚫 Token rejected:", err.name);
+      console.warn("Token rejected:", err.name);
       return res.status(401).json({ error: "Token invalid or expired" });
     }
     req.user = user;
@@ -166,6 +236,7 @@ app.post('/submit', authenticateToken, async (req, res) => {
       return res.status(401).json({ error: "Employee not found" });
 
     const employeeId = empRS[0].EmployeeID;
+    console.log(employeeId)
 
     const passMark = 0.8;                
     const attemptRS = await pool.request()
@@ -220,6 +291,17 @@ app.post('/submit', authenticateToken, async (req, res) => {
             Passed = @pass
         WHERE AttemptID = @aid
       `);
+      if (scorePct*100 < 70) {
+  await pool
+    .request()
+    .input("uid", sql.Int, employeeId)
+    .input("cid", sql.Int, courseId)
+    .query(`
+      UPDATE Progress
+      SET Viewed = 0
+      WHERE employeeID = @uid AND CourseID = @cid
+    `);
+}
 
     res.json({
       message: "Test graded",
@@ -404,6 +486,358 @@ app.post('/createquestion', async (req, res) => {
   }
 });
 
+
+app.get("/queryuser", async (req, res) => {
+  const { email } = req.query;
+  if (!email) {
+    return res.status(400).json({ error: "Missing ?email= parameter" });
+  }
+
+  const normalized = email.toLowerCase().trim();
+  if (!normalized.endsWith("@spartronics.com")) {
+    return res.status(400).json({ error: "E-mail must end with @spartronics.com" });
+  }
+
+  try {
+    await poolConnect;
+
+    const result = await pool
+      .request()
+      .input("email", sql.VarChar, normalized)
+      .query(`
+        SELECT
+          a.AttemptID    AS attemptID,
+          a.AttemptedAt  AS attemptDate,
+          a.Score        AS score,
+          a.Passed       AS isPassed,
+          a.CourseID     AS courseID,
+          c.Title        AS courseTitle
+        FROM Attempt a
+        JOIN Employee e ON e.EmployeeID = a.EmployeeID
+        JOIN Course   c ON c.CourseID   = a.CourseID
+        WHERE e.Email = @email
+        ORDER BY a.AttemptedAt DESC;
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ error: "No attempts found for that e-mail." });
+    }
+
+    return res.json({ attempts: result.recordset });
+  } catch (err) {
+    console.error("SQL error on /queryuser:", err);
+    return res.status(500).json({ error: "Server error while fetching attempts." });
+  }
+});
+
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 }
+});
+
+/* ── POST /lessons  (upload) ────────────────────────────────────────────────── */
+app.post("/lessons", upload.single("file"), async (req, res) => {
+  try {
+    const { courseName = "", lessonTitle = "" } = req.body;
+    if (!req.file) return res.status(400).json({ error: "File is required." });
+
+    const ok = [
+      "video/mp4",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ].includes(req.file.mimetype);
+    if (!ok) return res.status(415).json({ error: "Unsupported file type." });
+
+    await poolConnect;
+
+    /* 1. Get or create CourseID */
+    let courseID;
+    const courseQ = await pool
+      .request()
+      .input("title", sql.NVarChar, courseName.trim())
+      .query("SELECT CourseID FROM dbo.Course WHERE Title = @title");
+   if (courseQ.recordset.length === 0) {
+  return res.status(400).json({ error: "Course does not exist." });
+}
+courseID = courseQ.recordset[0].CourseID;
+
+    /* 2. Insert Lesson */
+    const newL = await pool
+      .request()
+      .input("cid",  sql.Int,           courseID)
+      .input("lt",   sql.NVarChar,      lessonTitle.trim())
+      .input("fn",   sql.NVarChar,      req.file.originalname)
+      .input("mt",   sql.NVarChar,      req.file.mimetype)
+      .input("data", sql.VarBinary(sql.MAX), req.file.buffer)
+      .query(`
+        INSERT INTO dbo.Lesson (CourseID, LessonTitle, FileName, MimeType, FileData)
+        OUTPUT inserted.LessonID AS id
+        VALUES (@cid, @lt, @fn, @mt, @data);
+      `);
+
+    res.status(201).json({ lessonID: newL.recordset[0].id, message: "Lesson uploaded." });
+  } catch (err) {
+    console.error("Upload failed:", err);
+    res.status(500).json({ error: "Server error during upload." });
+  }
+});
+
+/* ── GET /lessons           (list) ──────────────────────────────────────────── */
+app.get("/lessons", async (req, res) => {
+  try {
+    const { course = "" } = req.query;
+    await poolConnect;
+
+    const query = course
+      ? `SELECT l.LessonID, l.LessonTitle, l.CourseID, c.Title AS CourseTitle,
+                l.FileName, l.MimeType, l.UploadedOn
+         FROM   dbo.Lesson l
+         JOIN   dbo.Course c ON c.CourseID = l.CourseID
+         WHERE  c.Title = @course
+         ORDER  BY l.UploadedOn DESC`
+      : `SELECT l.LessonID, l.LessonTitle, l.CourseID, c.Title AS CourseTitle,
+                l.FileName, l.MimeType, l.UploadedOn
+         FROM   dbo.Lesson l
+         JOIN   dbo.Course c ON c.CourseID = l.CourseID
+         ORDER  BY l.UploadedOn DESC`;
+
+    const { recordset } = await pool
+      .request()
+      .input("course", sql.NVarChar, course)
+      .query(query);
+
+    res.json({ lessons: recordset });
+  } catch (err) {
+    console.error("List failed:", err);
+    res.status(500).json({ error: "Server error while listing lessons." });
+  }
+});
+
+
+/* ── GET /lessons/:id/file  (stream) ────────────────────────────────────────── */
+app.get("/lessons/:id/file", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid ID." });
+
+    await poolConnect;
+
+    const { recordset } = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query("SELECT FileName, MimeType, FileData FROM dbo.Lesson WHERE LessonID = @id");
+
+    if (!recordset.length) return res.status(404).json({ error: "Lesson not found." });
+
+    const { FileName, MimeType, FileData } = recordset[0];
+
+    // Reconstruct file from buffer
+    const buffer = Buffer.from(FileData);
+
+    // Set headers
+    res.set({
+      "Content-Type": MimeType,
+      "Content-Disposition": `inline; filename="${FileName}"`,
+      "Content-Length": buffer.length
+    });
+
+    // Stream via PassThrough
+    const readStream = new stream.PassThrough();
+    readStream.end(buffer);
+    readStream.pipe(res);
+
+    // Optional debug: write file to disk for inspection
+    // fs.writeFileSync("debug_downloaded.pptx", buffer);
+  } catch (err) {
+    console.error("Stream failed:", err);
+    res.status(500).json({ error: "Server error while streaming file." });
+  }
+});
+app.post("/progress/view", authenticateToken, async (req, res) => {
+  const { courseID, lessonID } = req.body;
+  
+  const employeeEmail = req.user.sub;
+  try {
+    await poolConnect;
+
+    const { recordset: empRS } = await pool.request()
+      .input('email', sql.NVarChar, employeeEmail)
+      .query('SELECT employeeID FROM Employee WHERE Email = @email');
+    if (!empRS.length)
+      return res.status(401).json({ error: "Employee not found" });
+
+    const employeeID = empRS[0].employeeID;
+
+
+  
+  if (!employeeID || !courseID || !lessonID)
+    return res.status(400).json({ error: "Missing required data." });
+
+
+    await poolConnect;
+
+
+    
+    await pool
+      .request()
+      .input("uid", sql.Int, employeeID)
+      .input("cid", sql.Int, courseID)
+      .input("lid", sql.Int, lessonID)
+      .query(`
+        MERGE Progress AS target
+        USING (SELECT @uid AS employeeID, @cid AS CourseID, @lid AS LessonID) AS src
+        ON target.employeeID = src.employeeID AND target.CourseID = src.CourseID AND target.LessonID = src.LessonID
+        WHEN MATCHED THEN
+          UPDATE SET Viewed = 1, LastViewed = GETDATE()
+        WHEN NOT MATCHED THEN
+          INSERT (employeeID, CourseID, LessonID, Viewed, LastViewed)
+          VALUES (@uid, @cid, @lid, 1, GETDATE());
+      `);
+
+    res.status(200).json({ message: "Lesson view recorded." });
+  } catch (err) {
+    console.error("Database error:", err); // log actual error
+    res.status(500).json({ error: "Server error", detail: err.message });
+  }
+});
+
+app.get("/progress/status",authenticateToken, async (req, res) => {
+  try{
+      const employeeEmail = req.user.sub;
+
+   await poolConnect;
+
+    const { recordset: empRS } = await pool.request()
+      .input('email', sql.NVarChar, employeeEmail)
+      .query('SELECT employeeID FROM Employee WHERE Email = @email');
+    
+    if (!empRS.length)
+      return res.status(401).json({ error: "Employee not found" });
+
+    const employeeID = empRS[0].employeeID;
+  const courseID = Number(req.query.courseID);
+
+  if (!employeeID || !courseID) return res.status(400).json({ error: "Missing input" });
+
+  await poolConnect;
+
+  // Check if user failed last attempt
+  const lastAttempt = await pool
+    .request()
+    .input("uid", sql.Int, employeeID)
+    .input("cid", sql.Int, courseID)
+    .query(`
+      SELECT TOP 1 Passed
+      FROM Attempt
+      WHERE employeeID = @uid AND CourseID = @cid
+      ORDER BY AttemptedAt DESC
+    `);
+
+  const failedLast = lastAttempt.recordset[0]?.Passed === false;
+
+  // Count total lessons
+  const totalLessons = await pool
+    .request()
+    .input("cid", sql.Int, courseID)
+    .query("SELECT COUNT(*) AS count FROM Lesson WHERE CourseID = @cid");
+
+  // Count lessons viewed
+  const viewedLessons = await pool
+    .request()
+    .input("uid", sql.Int, employeeID)
+    .input("cid", sql.Int, courseID)
+    .query("SELECT COUNT(*) AS count FROM Progress WHERE employeeID = @uid AND CourseID = @cid AND Viewed = 1");
+
+  const canTakeTest = 
+    viewedLessons.recordset[0].count === totalLessons.recordset[0].count;
+
+  res.json({
+    canTakeTest,
+    failedLast,
+    totalLessons: totalLessons.recordset[0].count,
+    viewedLessons: viewedLessons.recordset[0].count
+  })
+  
+  ;}
+  catch(err){
+     console.error("Database error:", err); // log actual error
+    res.status(500).json({ error: "Server error", detail: err.message });
+  }
+});
+app.post('/changepassword', authenticateToken, async (req, res) => {
+  console.log("pressed")
+  const { password, confirmPassword } = req.body;
+  const employeeID = req.user?.employeeID;
+  console.log(req.user);
+
+  if (!employeeID || !password || !confirmPassword)
+    return res.status(400).json({ error: "Missing required fields." });
+
+  if (password !== confirmPassword)
+    return res.status(400).json({ error: "Passwords do not match." });
+
+  try {
+    const hashed = await bcrypt.hash(password, 10);
+
+    await poolConnect;
+    await pool.request()
+      .input('eid', sql.Int, employeeID)
+      .input('pw', sql.NVarChar, hashed)
+      .query(`
+        UPDATE Employee SET loginPassword = @pw WHERE employeeID = @eid
+      `);
+
+    res.json({ message: "Password changed successfully." });
+    console.log("worked")
+  } catch (err) {
+    console.error("Change password error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+
+app.post('/progress/enter', authenticateToken, async (req, res) => {
+  const { courseID, lessonID } = req.body;
+  const employeeID = req.user?.employeeID;
+  if (!employeeID || !courseID || !lessonID) return res.status(400).json({ error: "Missing data" });
+
+  await poolConnect;
+  await pool.request()
+    .input("eid", sql.Int, employeeID)
+    .input("cid", sql.Int, courseID)
+    .input("lid", sql.Int, lessonID)
+    .query(`
+      MERGE Progress AS target
+      USING (SELECT @eid AS employeeID, @cid AS courseID, @lid AS lessonID) AS src
+      ON target.employeeID = src.employeeID AND target.courseID = src.courseID AND target.lessonID = src.lessonID
+      WHEN MATCHED THEN UPDATE SET TimeEntered = GETDATE()
+      WHEN NOT MATCHED THEN INSERT (employeeID, courseID, lessonID, TimeEntered) VALUES (@eid, @cid, @lid, GETDATE());
+    `);
+
+  res.json({ message: "Entry time recorded" });
+});
+
+// Record TimeExited
+app.post('/progress/exit', authenticateToken, async (req, res) => {
+  const { courseID, lessonID } = req.body;
+  const employeeID = req.user?.employeeID;
+  if (!employeeID || !courseID || !lessonID) return res.status(400).json({ error: "Missing data" });
+
+  await poolConnect;
+  await pool.request()
+    .input("eid", sql.Int, employeeID)
+    .input("cid", sql.Int, courseID)
+    .input("lid", sql.Int, lessonID)
+    .query(`
+      UPDATE Progress
+      SET TimeExited = GETDATE(),
+          TotalSeconds = DATEDIFF(SECOND, TimeEntered, GETDATE())
+      WHERE employeeID = @eid AND courseID = @cid AND lessonID = @lid;
+    `);
+
+  res.json({ message: "Exit time recorded" });
+});
 
 
 
