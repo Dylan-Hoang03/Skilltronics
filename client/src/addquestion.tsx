@@ -71,7 +71,8 @@ export default function AddQuestion() {
   return (
 <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-tr from-blue-600 to-white py-12 px-4">
       <img src={logo} alt="Logo" className="absolute top-4 right-4 h-8 w-auto" />
-      <h1 className="absolute top-4 left-4 text-2xl font-bold text-blue-800">SKILLTRONICS</h1>
+      <h1 className="absolute top-4 left-4 text-2xl font-bold text-blue-800">
+eLearning Portal</h1>
 
     <form
   onSubmit={handleSubmit}

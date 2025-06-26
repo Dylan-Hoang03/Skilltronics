@@ -69,7 +69,8 @@ export default function CheckAnswer() {
         className="absolute top-4 right-4 h-8 w-auto"
       />
       <h1 className="absolute top-4 left-4 text-2xl font-bold text-blue-800">
-        SKILLTRONICS
+        
+eLearning Portal
       </h1>
 
       {/* Form */}

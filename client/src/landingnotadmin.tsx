@@ -13,7 +13,8 @@ export default function LandingNotAdmin() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-tr from-blue-600 to-white py-12 px-4">
-      <h1 className="text-4xl font-bold text-white mb-10">Welcome to Skilltronics!</h1>
+      <h1 className="text-4xl font-bold text-white mb-10">Welcome to 
+eLearning Portal!</h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-xl">
         {buttons.map((btn, idx) => (
