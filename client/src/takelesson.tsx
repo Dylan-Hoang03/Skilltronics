@@ -9,10 +9,10 @@ interface Course {
 export default function TakeLesson() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const token    = localStorage.getItem("token");
+  const token = localStorage.getItem("token");
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -21,7 +21,6 @@ export default function TakeLesson() {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Failed to load courses");
-        /* ‼️ If your backend sends { courses:[...] } wrap with .courses */
         const data: Course[] = await res.json();
         setCourses(data);
       } catch (err: any) {
@@ -31,24 +30,32 @@ export default function TakeLesson() {
       }
     };
     fetchCourses();
-  }, []);              // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (loading) return <p className="p-4">Loading…</p>;
-  if (error)   return <p className="p-4 text-red-600">{error}</p>;
+  }, []);
 
   return (
-    <div className="p-6 space-y-4 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold">Choose a Course to Learn</h1>
+    <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-tr from-blue-600 to-white py-12 px-4">
+      <h1 className="text-3xl font-bold text-white mb-8">Review Course Material</h1>
 
-      {courses.map((c) => (
-        <button
-          key={c.CourseID}
-          className="block w-full text-left bg-blue-200 hover:bg-blue-300 rounded p-3 mb-2"
-          onClick={() => navigate(`/lesson/${c.CourseID}`)}
-        >
-          {c.Title}
-        </button>
-      ))}
+      <div className="w-full max-w-2xl space-y-4">
+        {loading && (
+          <p className="text-center text-lg font-medium text-blue-800">Loading…</p>
+        )}
+        {error && (
+          <p className="text-center text-red-600 font-medium">{error}</p>
+        )}
+
+        {!loading &&
+          !error &&
+          courses.map((c) => (
+            <button
+              key={c.CourseID}
+              className="w-full text-left px-6 py-4 rounded-lg transition shadow font-medium text-lg bg-white hover:bg-blue-100 border border-blue-500 text-blue-800"
+              onClick={() => navigate(`/lesson/${c.CourseID}`)}
+            >
+              {c.Title}
+            </button>
+          ))}
+      </div>
     </div>
   );
 }

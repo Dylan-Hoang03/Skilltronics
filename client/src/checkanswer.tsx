@@ -10,6 +10,7 @@ interface Attempt {
   score: number;
   attemptDate: string; // ISO
   isPassed: boolean;
+  totalSeconds: number;
 }
 
 
@@ -46,6 +47,8 @@ export default function CheckAnswer() {
       }
 
       setAttempts(data.attempts || []); // expect { attempts: [...] }
+      console.log("Attempt data:", data.attempts);
+
       setLoading(false);
       // If you still want to go somewhere else after the query, call navigate()
       // navigate("/");
@@ -57,7 +60,8 @@ export default function CheckAnswer() {
   };
 
   return (
-    <div className="relative h-screen flex items-center justify-center bg-gradient-to-tr from-blue-600 to-white">
+  <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-tr from-blue-600 to-white py-10 px-4">
+
       {/* Header / branding */}
       <img
         src={logo}
@@ -94,48 +98,54 @@ export default function CheckAnswer() {
         </button>
       </form>
 
-      {/* Results */}
-      <div className="absolute bottom-10 w-[90%] max-w-4xl">
-        {loading && (
-          <p className="text-center text-lg font-medium text-blue-800">
-            Loading…
-          </p>
-        )}
+      {/* Results */}<div className="mt-8 w-[90%] max-w-4xl max-h-[50vh] overflow-auto bg-white rounded-lg shadow-md border">
 
-        {!loading && attempts.length === 0 && (
-          <p className="text-center text-lg text-gray-700">
-            No attempts to show.
-          </p>
-        )}
+  {loading && (
+    <p className="text-center text-lg font-medium text-blue-800 p-4">
+      Loading…
+    </p>
+  )}
 
-        {!loading && attempts.length > 0 && (
-          <table className="w-full mt-6 border-collapse bg-white shadow-md rounded-lg overflow-hidden">
-            <thead className="bg-blue-600 text-white">
-  <tr>
-    <th className="py-2 px-4 text-left">Attempt&nbsp;ID</th>
-    <th className="py-2 px-4 text-left">Course</th>
-    <th className="py-2 px-4 text-left">Date</th>
-    <th className="py-2 px-4 text-left">Score</th>
-    <th className="py-2 px-4 text-left">Passed?</th>
-  </tr>
-</thead>
-<tbody>
-  {attempts.map(a => (
-    <tr key={a.attemptID} className="odd:bg-gray-100 even:bg-gray-50">
-      <td className="py-2 px-4">{a.attemptID}</td>
-      <td className="py-2 px-4">{a.courseTitle}</td>
-      <td className="py-2 px-4">
-        {new Date(a.attemptDate).toLocaleString()}
-      </td>
-      <td className="py-2 px-4">{a.score}</td>
-      <td className="py-2 px-4">{a.isPassed ? "Passed" : "Failed"}</td>
-    </tr>
-  ))}
-</tbody>
+  {!loading && attempts.length === 0 && (
+    <p className="text-center text-lg text-gray-700 p-4">
+      No attempts to show.
+    </p>
+  )}
 
-          </table>
-        )}
-      </div>
+  {!loading && attempts.length > 0 && (
+    <table className="w-full border-collapse">
+      <thead className="bg-blue-600 text-white sticky top-0">
+        <tr>
+          <th className="py-2 px-4 text-left">Attempt&nbsp;ID</th>
+          <th className="py-2 px-4 text-left">Course</th>
+          <th className="py-2 px-4 text-left">Date</th>
+          <th className="py-2 px-4 text-left">Score</th>
+          <th className="py-2 px-4 text-left">Passed?</th>
+          <th className="py-2 px-4 text-left">Time Spent</th>
+        </tr>
+      </thead>
+      <tbody>
+        {attempts.map((a) => (
+          <tr key={a.attemptID} className="odd:bg-gray-100 even:bg-gray-50">
+            <td className="py-2 px-4">{a.attemptID}</td>
+            <td className="py-2 px-4">{a.courseTitle}</td>
+            <td className="py-2 px-4">
+              {new Date(a.attemptDate).toLocaleString()}
+            </td>
+            <td className="py-2 px-4">{a.score}</td>
+            <td className="py-2 px-4">{a.isPassed ? "Passed" : "Failed"}</td>
+            <td className="py-2 px-4">
+              {Number.isFinite(a.totalSeconds)
+                ? `${Math.floor(a.totalSeconds / 60)} min ${a.totalSeconds % 60} sec`
+                : "0 min 0 sec"}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+</div>
+
     </div>
   );
 }

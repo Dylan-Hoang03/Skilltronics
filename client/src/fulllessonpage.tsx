@@ -5,16 +5,16 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 interface Lesson {
-  LessonID:     number;
-  LessonTitle:  string;
-  MimeType:     string;
-  FileName:     string;
-  CourseID:     number;
+  LessonID: number;
+  LessonTitle: string;
+  MimeType: string;
+  FileName: string;
+  CourseID: number;
 }
 
 export default function CourseLessons() {
   const { courseId } = useParams<{ courseId: string }>();
-  const courseID = courseId; // alias for consistent naming
+  const courseID = courseId;
   const navigate = useNavigate();
 
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -34,10 +34,7 @@ export default function CourseLessons() {
 
         const data: { lessons: Lesson[] } | Lesson[] = await res.json();
         const list = Array.isArray(data) ? data : data.lessons;
-        console.log("courseID from URL:", courseID);
-        console.log("lessons from backend:", list);
 
-        // Only keep lessons that match the current course ID
         const filtered = list.filter(
           (lesson) => lesson.CourseID === Number(courseID)
         );
@@ -52,18 +49,13 @@ export default function CourseLessons() {
     })();
   }, [courseID]);
 
-  /* ---- update progress when lesson is viewed ------------------------ */
+  /* ---- mark lesson as viewed ---------------------------------------- */
   useEffect(() => {
     if (!selected) return;
 
     const token = localStorage.getItem("token");
-    console.log("Progress payload", {
-  courseID: selected.CourseID,
-  lessonID: selected.LessonID,
-});
 
-
-    fetch("http://localhost:5000/progress/view", {
+    fetch("http://localhost:5000/course/view", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -74,64 +66,95 @@ export default function CourseLessons() {
         lessonID: selected.LessonID,
       }),
     }).then((res) => {
-      if (!res.ok) {
-        console.error("Failed to mark progress");
-      } else {
-        console.log(`Marked lesson ${selected.LessonID} as viewed`);
-      }
+      if (!res.ok) console.error("Failed to mark lesson as viewed");
     });
   }, [selected]);
 
+  /* ---- track time spent for course ---------------------------------- */
+  useEffect(() => {
+    if (!selected) return;
+    const token = localStorage.getItem("token");
+
+    // Log entry time
+    fetch("http://localhost:5000/course/enter", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        courseID: selected.CourseID,
+        lessonID: selected.LessonID,
+      }),
+    });
+
+    const handleExit = () => {
+      fetch("http://localhost:5000/course/exit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          courseID: selected.CourseID,
+          lessonID: selected.LessonID,
+        }),
+      });
+    };
+
+    window.addEventListener("beforeunload", handleExit);
+    return () => {
+      handleExit();
+      window.removeEventListener("beforeunload", handleExit);
+    };
+  }, [selected]);
+
   /* ---- helpers ------------------------------------------------------- */
-  const fileURL = (id: number) =>
-    `http://localhost:5000/lessons/${id}/file`;
+  const fileURL = (id: number) => `http://localhost:5000/lessons/${id}/file`;
 
-const renderViewer = (lesson: Lesson) => {
-  if (lesson.MimeType === "video/mp4") {
+  const renderViewer = (lesson: Lesson) => {
+    if (lesson.MimeType === "video/mp4") {
+      return (
+        <video
+          key={lesson.LessonID}
+          src={fileURL(lesson.LessonID)}
+          controls
+          className="w-full max-h-[80vh] bg-black rounded"
+        />
+      );
+    }
+
+    if (
+      lesson.MimeType.includes("powerpoint") ||
+      lesson.FileName.toLowerCase().endsWith(".ppt") ||
+      lesson.FileName.toLowerCase().endsWith(".pptx")
+    ) {
+      return (
+        <iframe
+          key={lesson.LessonID}
+          src={`http://localhost:5000/lessons/${lesson.LessonID}/pdf`}
+          className="w-full h-[80vh] border rounded"
+          title={lesson.LessonTitle}
+        />
+      );
+    }
+
     return (
-      <video
-        key={lesson.LessonID}
-        src={fileURL(lesson.LessonID)}
-        controls
-        className="w-full max-h-[80vh] bg-black rounded"
-      />
+      <div className="p-6">
+        <p>
+          Preview not supported.{" "}
+          <a
+            href={fileURL(lesson.LessonID)}
+            className="text-blue-600 underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Download&nbsp;{lesson.FileName}
+          </a>
+        </p>
+      </div>
     );
-  }
-
-  // ✅ Use converted PDF instead of Office viewer
-  if (
-    lesson.MimeType.includes("powerpoint") ||
-    lesson.FileName.toLowerCase().endsWith(".ppt") ||
-    lesson.FileName.toLowerCase().endsWith(".pptx")
-  ) {
-    return (
-      <iframe
-        key={lesson.LessonID}
-        src={`http://localhost:5000/lessons/${lesson.LessonID}/pdf`}
-        className="w-full h-[80vh] border rounded"
-        title={lesson.LessonTitle}
-      />
-    );
-  }
-
-  // Fallback
-  return (
-    <div className="p-6">
-      <p>
-        Preview not supported.{" "}
-        <a
-          href={fileURL(lesson.LessonID)}
-          className="text-blue-600 underline"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Download&nbsp;{lesson.FileName}
-        </a>
-      </p>
-    </div>
-  );
-};
-
+  };
 
   /* ---- UI ------------------------------------------------------------ */
   if (loading) return <p className="p-4">Loading…</p>;

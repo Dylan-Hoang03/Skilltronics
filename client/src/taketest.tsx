@@ -8,6 +8,8 @@ interface Course {
 
 interface CourseWithStatus extends Course {
   canTakeTest: boolean;
+    hasPassed: boolean;
+
 }
 
 export default function Taketest() {
@@ -35,7 +37,8 @@ export default function Taketest() {
             const progData = await progRes.json();
             return {
               ...course,
-              canTakeTest: progData.canTakeTest ?? false,
+                  canTakeTest: progData.canTakeTest ?? false,
+                  hasPassed: progData.hasPassed ?? false,
             };
           })
         );
@@ -50,32 +53,53 @@ export default function Taketest() {
     fetchCourses();
   }, []);
 
-  if (loading) return <p className="p-4">Loading…</p>;
-  if (error) return <p className="p-4 text-red-600">{error}</p>;
-
   return (
-    <div className="p-6 space-y-4 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold">Choose a Course to Take</h1>
+    <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-tr from-blue-600 to-white py-12 px-4">
+      <h1 className="text-3xl font-bold text-white mb-8">Available Courses</h1>
 
-      {courses.map((c) => (
-        <button
-          key={c.CourseID}
-          className={`block w-full text-left rounded p-3 mb-2 ${
-            c.canTakeTest
-              ? "bg-blue-200 hover:bg-blue-300"
-              : "bg-gray-200 text-gray-500 cursor-not-allowed"
-          }`}
-          onClick={() => c.canTakeTest && navigate(`/test/${c.CourseID}`)}
-          disabled={!c.canTakeTest}
-        >
-          {c.Title}
-          {!c.canTakeTest && (
-            <span className="ml-2 text-sm italic text-red-500">
-              (Review lessons first)
-            </span>
-          )}
-        </button>
-      ))}
+      <div className="w-full max-w-2xl space-y-4">
+        {loading && (
+          <p className="text-center text-lg font-medium text-blue-800">Loading…</p>
+        )}
+        {error && (
+          <p className="text-center text-red-600 font-medium">{error}</p>
+        )}
+
+        {!loading &&
+          !error &&
+courses.map((c) => (
+  <button
+    key={c.CourseID}
+    className={`w-full text-left px-6 py-4 rounded-lg transition shadow font-medium text-lg ${
+      c.hasPassed
+        ? "bg-gray-200 text-gray-500 cursor-not-allowed border border-gray-300"
+        : c.canTakeTest
+        ? "bg-white hover:bg-blue-100 border border-blue-500 text-blue-800"
+        : "bg-gray-100 border border-gray-300 text-gray-400 cursor-not-allowed"
+    }`}
+    onClick={() =>
+      c.canTakeTest && !c.hasPassed && navigate(`/test/${c.CourseID}`)
+    }
+    disabled={!c.canTakeTest || c.hasPassed}
+  >
+    <div className="flex justify-between items-center">
+      <span>
+        {c.Title}
+        {c.hasPassed && (
+          <span className="ml-2 text-green-600 font-semibold">✅</span>
+        )}
+      </span>
+
+      {!c.hasPassed && !c.canTakeTest && (
+        <span className="text-sm italic text-red-500">
+          (Review lessons first)
+        </span>
+      )}
+    </div>
+  </button>
+))
+}
+      </div>
     </div>
   );
 }

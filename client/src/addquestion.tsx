@@ -69,11 +69,14 @@ export default function AddQuestion() {
   };
 
   return (
-    <div className="relative h-screen flex items-center justify-center bg-gradient-to-tr from-blue-600 to-white">
+<div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-tr from-blue-600 to-white py-12 px-4">
       <img src={logo} alt="Logo" className="absolute top-4 right-4 h-8 w-auto" />
       <h1 className="absolute top-4 left-4 text-2xl font-bold text-blue-800">SKILLTRONICS</h1>
 
-      <form onSubmit={handleSubmit} className="bg-gray-100 p-8 rounded-xl shadow-xl w-full max-w-3xl space-y-6">
+    <form
+  onSubmit={handleSubmit}
+  className="bg-white p-6 rounded-xl shadow-xl w-full max-w-2xl space-y-6"
+>
         {/* Course title (only entered once per session) */}
         <label className="block">
           <span className="font-medium">Course Title</span>

@@ -505,19 +505,23 @@ app.get("/queryuser", async (req, res) => {
       .request()
       .input("email", sql.VarChar, normalized)
       .query(`
-        SELECT
-          a.AttemptID    AS attemptID,
-          a.AttemptedAt  AS attemptDate,
-          a.Score        AS score,
-          a.Passed       AS isPassed,
-          a.CourseID     AS courseID,
-          c.Title        AS courseTitle
-        FROM Attempt a
-        JOIN Employee e ON e.EmployeeID = a.EmployeeID
-        JOIN Course   c ON c.CourseID   = a.CourseID
-        WHERE e.Email = @email
-        ORDER BY a.AttemptedAt DESC;
+      SELECT
+      a.AttemptID    AS attemptID,
+      a.AttemptedAt  AS attemptDate,
+      a.Score        AS score,
+      a.Passed       AS isPassed,
+      a.CourseID     AS courseID,
+      c.Title        AS courseTitle,
+      ISNULL(s.totalSeconds, 0) AS totalSeconds
+    FROM Attempt a
+    JOIN Employee e ON e.EmployeeID = a.EmployeeID
+    JOIN Course   c ON c.CourseID   = a.CourseID
+    LEFT JOIN CourseTimeSummary s ON s.employeeID = e.EmployeeID AND s.courseID = a.CourseID
+    WHERE e.Email = @email
+    ORDER BY a.AttemptedAt DESC;
+
       `);
+console.log("Query result:", result.recordset);
 
     if (result.recordset.length === 0) {
       return res.status(404).json({ error: "No attempts found for that e-mail." });
@@ -796,48 +800,66 @@ app.post('/changepassword', authenticateToken, async (req, res) => {
   }
 });
 
-
-app.post('/progress/enter', authenticateToken, async (req, res) => {
-  const { courseID, lessonID } = req.body;
+// courseTime.js
+app.post("/course/enter", authenticateToken, async (req, res) => {
+  const { courseID } = req.body;
   const employeeID = req.user?.employeeID;
-  if (!employeeID || !courseID || !lessonID) return res.status(400).json({ error: "Missing data" });
+  if (!employeeID || !courseID) return res.status(400).json({ error: "Missing data" });
 
   await poolConnect;
   await pool.request()
     .input("eid", sql.Int, employeeID)
     .input("cid", sql.Int, courseID)
-    .input("lid", sql.Int, lessonID)
     .query(`
-      MERGE Progress AS target
-      USING (SELECT @eid AS employeeID, @cid AS courseID, @lid AS lessonID) AS src
-      ON target.employeeID = src.employeeID AND target.courseID = src.courseID AND target.lessonID = src.lessonID
-      WHEN MATCHED THEN UPDATE SET TimeEntered = GETDATE()
-      WHEN NOT MATCHED THEN INSERT (employeeID, courseID, lessonID, TimeEntered) VALUES (@eid, @cid, @lid, GETDATE());
+      -- Initialize CourseTimeSummary if needed
+      MERGE CourseTimeSummary AS target
+      USING (SELECT @eid AS employeeID, @cid AS courseID) AS src
+      ON target.employeeID = src.employeeID AND target.courseID = src.courseID
+      WHEN NOT MATCHED THEN
+        INSERT (employeeID, courseID, totalSeconds)
+        VALUES (@eid, @cid, 0);
+
+      -- Start tracking session
+      DELETE FROM CourseTimeSession WHERE employeeID = @eid AND courseID = @cid;
+      INSERT INTO CourseTimeSession (employeeID, courseID, timeEntered)
+      VALUES (@eid, @cid, GETDATE());
     `);
 
-  res.json({ message: "Entry time recorded" });
+  res.json({ message: "Started course session" });
 });
 
-// Record TimeExited
-app.post('/progress/exit', authenticateToken, async (req, res) => {
-  const { courseID, lessonID } = req.body;
+app.post("/course/exit", authenticateToken, async (req, res) => {
+  const { courseID } = req.body;
   const employeeID = req.user?.employeeID;
-  if (!employeeID || !courseID || !lessonID) return res.status(400).json({ error: "Missing data" });
+  if (!employeeID || !courseID) return res.status(400).json({ error: "Missing data" });
 
   await poolConnect;
   await pool.request()
     .input("eid", sql.Int, employeeID)
     .input("cid", sql.Int, courseID)
-    .input("lid", sql.Int, lessonID)
     .query(`
-      UPDATE Progress
-      SET TimeExited = GETDATE(),
-          TotalSeconds = DATEDIFF(SECOND, TimeEntered, GETDATE())
-      WHERE employeeID = @eid AND courseID = @cid AND lessonID = @lid;
+      DECLARE @entered DATETIME;
+      SELECT @entered = timeEntered
+      FROM CourseTimeSession
+      WHERE employeeID = @eid AND courseID = @cid;
+
+      IF @entered IS NOT NULL
+      BEGIN
+        DECLARE @duration INT = DATEDIFF(SECOND, @entered, GETDATE());
+
+        UPDATE CourseTimeSummary
+        SET totalSeconds = totalSeconds + @duration
+        WHERE employeeID = @eid AND courseID = @cid;
+
+        DELETE FROM CourseTimeSession
+        WHERE employeeID = @eid AND courseID = @cid;
+      END
     `);
 
-  res.json({ message: "Exit time recorded" });
+  res.json({ message: "Ended course session" });
 });
+
+
 
 
 
