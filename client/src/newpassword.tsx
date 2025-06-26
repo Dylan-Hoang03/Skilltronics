@@ -36,7 +36,12 @@ export default function ChangePassword() {
 
   return (
     <div className="relative h-screen flex items-center justify-center bg-gradient-to-tr from-blue-600 to-white">
-      <img src={logo} alt="Logo" className="absolute top-4 right-4 h-8 w-auto" />
+     <button
+          onClick={() => navigate("/landingnotadmin")}
+          className="text-white bg-blue-800 hover:bg-blue-900 px-4  rounded shadow absolute top-4 right-4 h-8 w-auto "
+        >
+          ← Back
+        </button>
       <h1 className="absolute top-4 left-4 text-2xl font-bold text-blue-800">
 eLearning Portal</h1>
 

@@ -658,7 +658,7 @@ app.get("/lessons/:id/file", async (req, res) => {
     res.status(500).json({ error: "Server error while streaming file." });
   }
 });
-app.post("/progress/view", authenticateToken, async (req, res) => {
+app.post("/course/view", authenticateToken, async (req, res) => {
   const { courseID, lessonID } = req.body;
   
   const employeeEmail = req.user.sub;

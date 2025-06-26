@@ -33,10 +33,23 @@ export default function TakeLesson() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-tr from-blue-600 to-white py-12 px-4">
-      <h1 className="text-3xl font-bold text-white mb-8">Review Course Material</h1>
+    <div className="min-h-screen bg-gradient-to-tr from-blue-600 to-white py-6 px-4 flex flex-col items-center">
+      
+      {/* Top navigation bar */}
+      <div className="w-full max-w-5xl flex justify-between items-center mb-8">
+        <h1 className="absolute top-4 left-4 text-2xl text-blue-800">eLearning Portal</h1>
+        <button
+          onClick={() => navigate("/landingnotadmin")}
+          className="text-white bg-blue-800 hover:bg-blue-900 px-4  rounded shadow absolute top-4 right-4 h-8 w-auto "
+        >
+          ← Back
+        </button>
+      </div>
 
+      {/* Course selection */}
       <div className="w-full max-w-2xl space-y-4">
+        <h2 className="text-3xl font-bold text-white mb-4">Review Course Material</h2>
+
         {loading && (
           <p className="text-center text-lg font-medium text-blue-800">Loading…</p>
         )}
