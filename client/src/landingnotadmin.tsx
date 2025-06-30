@@ -6,9 +6,10 @@ export default function LandingNotAdmin() {
 
   const buttons = [
     { label: "Take Test", onClick: () => navigate("/taketest") },
-    { label: "View Score", onClick: () => alert("Coming soon!") },
+    { label: "View Score", onClick: () =>navigate("/viewownscore") },
     { label: "Review Material", onClick: () => navigate("/takelesson") },
     { label: "Change Password", onClick: () => navigate("/newpassword") },
+    
   ];
 
   return (

@@ -32,6 +32,7 @@ export default function Form() {
 
       localStorage.setItem("token", data.token);
       localStorage.setItem("isAdmin", JSON.stringify(data.user.isAdmin));
+      localStorage.setItem("email",data.user.email);
 
       alert(`Login successful! Welcome ${data.user.firstName} ${data.user.lastName}`);
 

@@ -41,7 +41,6 @@ app.get("/lessons/:id/pdf", async (req, res) => {
 
   await poolConnect;
 
-  // 1. fetch metadata
   const r = await pool.request()
     .input("id", sql.Int, id)
     .query(`
@@ -52,21 +51,22 @@ app.get("/lessons/:id/pdf", async (req, res) => {
   if (!r.recordset.length) return res.status(404).end();
   const lesson = r.recordset[0];
 
-  // 2. if already cached → stream cached PDF
+  // ✅ If the file is already a PDF, just return it directly
+  if (lesson.MimeType === "application/pdf") {
+    res.set("Content-Type", "application/pdf");
+    return res.end(lesson.FileData);
+  }
+
+  // ✅ If a converted PDF is cached, return that
   if (lesson.PdfReady) {
     res.set("Content-Type", "application/pdf");
     return res.end(lesson.PdfData);
   }
 
-  // 3. convert (only ppt / pptx)
-  if (!lesson.MimeType.includes("powerpoint")) {
-    return res.status(415).json({ error: "Not a PowerPoint" });
-  }
-
+  // ✅ Only convert if it's a PowerPoint file
   try {
-    const pdfBuf = await convertPptxToPdf (lesson.FileData);
+    const pdfBuf = await convertPptxToPdf(lesson.FileData);
 
-    // 4. cache it back to DB (async but no await needed for streaming)
     pool.request()
       .input("id", sql.Int, id)
       .input("pdf", sql.VarBinary(sql.MAX), pdfBuf)
@@ -76,17 +76,17 @@ app.get("/lessons/:id/pdf", async (req, res) => {
         WHERE LessonID = @id;
       `).catch(console.error);
 
-    // 5. stream to user
     res.set("Content-Type", "application/pdf");
     res.end(pdfBuf);
   } catch (e) {
-  console.error("PDF conversion failed:", e);   // <– full stack here
-  res.status(500).json({                       // expose for debug only
-    error: "Conversion error",
-    details: String(e)                         // <-- send stack to browser
-  });
-}
+    console.error("PDF conversion failed:", e);
+    res.status(500).json({
+      error: "Conversion error",
+      details: String(e),
+    });
+  }
 });
+
 
 
 app.get('/', async (req, res) => {
@@ -521,7 +521,6 @@ app.get("/queryuser", async (req, res) => {
     ORDER BY a.AttemptedAt DESC;
 
       `);
-console.log("Query result:", result.recordset);
 
     if (result.recordset.length === 0) {
       return res.status(404).json({ error: "No attempts found for that e-mail." });
@@ -549,7 +548,7 @@ app.post("/lessons", upload.single("file"), async (req, res) => {
     const ok = [
       "video/mp4",
       "application/vnd.ms-powerpoint",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",'application/pdf'
     ].includes(req.file.mimetype);
     if (!ok) return res.status(415).json({ error: "Unsupported file type." });
 
@@ -585,33 +584,81 @@ courseID = courseQ.recordset[0].CourseID;
     console.error("Upload failed:", err);
     res.status(500).json({ error: "Server error during upload." });
   }
-});
+});app.get("/my-attempts", authenticateToken, async (req, res) => {
+  const email = req.user?.sub;
 
-/* ── GET /lessons           (list) ──────────────────────────────────────────── */
-app.get("/lessons", async (req, res) => {
+  if (!email || !email.endsWith("@spartronics.com")) {
+    return res.status(400).json({ error: "Invalid or missing user email." });
+  }
+
   try {
-    const { course = "" } = req.query;
     await poolConnect;
 
-    const query = course
-      ? `SELECT l.LessonID, l.LessonTitle, l.CourseID, c.Title AS CourseTitle,
-                l.FileName, l.MimeType, l.UploadedOn
-         FROM   dbo.Lesson l
-         JOIN   dbo.Course c ON c.CourseID = l.CourseID
-         WHERE  c.Title = @course
-         ORDER  BY l.UploadedOn DESC`
-      : `SELECT l.LessonID, l.LessonTitle, l.CourseID, c.Title AS CourseTitle,
-                l.FileName, l.MimeType, l.UploadedOn
-         FROM   dbo.Lesson l
-         JOIN   dbo.Course c ON c.CourseID = l.CourseID
-         ORDER  BY l.UploadedOn DESC`;
-
-    const { recordset } = await pool
+    const result = await pool
       .request()
-      .input("course", sql.NVarChar, course)
+      .input("email", sql.VarChar, email.toLowerCase().trim())
+      .query(`
+        SELECT
+          a.AttemptID    AS attemptID,
+          a.AttemptedAt  AS attemptDate,
+          a.Score        AS score,
+          a.Passed       AS isPassed,
+          a.CourseID     AS courseID,
+          c.Title        AS courseTitle,
+          ISNULL(s.totalSeconds, 0) AS totalSeconds
+        FROM Attempt a
+        JOIN Employee e ON e.EmployeeID = a.EmployeeID
+        JOIN Course   c ON c.CourseID   = a.CourseID
+        LEFT JOIN CourseTimeSummary s ON s.employeeID = e.EmployeeID AND s.courseID = a.CourseID
+        WHERE e.Email = @email
+        ORDER BY a.AttemptedAt DESC
+      `);
+
+    return res.json({ attempts: result.recordset });
+  } catch (err) {
+    console.error("SQL error on /my-attempts:", err);
+    return res.status(500).json({ error: "Server error while fetching attempts." });
+  }
+});
+
+
+
+app.get("/lessons", authenticateToken, async (req, res) => {
+  try {
+    const { courseID } = req.query;
+    const employeeID = req.user?.employeeID;
+
+    if (!courseID || !employeeID) {
+      return res.status(400).json({ error: "Missing courseID or employeeID" });
+    }
+
+    await poolConnect;
+
+    const query = `
+      SELECT 
+        l.LessonID,
+        l.LessonTitle,
+        l.CourseID,
+        l.FileName,
+        l.MimeType,
+        l.UploadedOn,
+        ISNULL(p.Viewed, 0) AS Viewed
+      FROM dbo.Lesson l
+      LEFT JOIN dbo.Progress p
+        ON p.LessonID = l.LessonID
+       AND p.CourseID = l.CourseID
+       AND p.employeeID = @employeeID
+      WHERE l.CourseID = @courseID
+      ORDER BY l.UploadedOn DESC
+    `;
+
+    const result = await pool
+      .request()
+      .input("employeeID", sql.Int, employeeID)
+      .input("courseID", sql.Int, courseID)
       .query(query);
 
-    res.json({ lessons: recordset });
+    res.json(result.recordset);
   } catch (err) {
     console.error("List failed:", err);
     res.status(500).json({ error: "Server error while listing lessons." });
@@ -860,6 +907,22 @@ app.post("/course/exit", authenticateToken, async (req, res) => {
 });
 
 
+app.get("/all-users", async (req, res) => {
+  await poolConnect;
+  const result = await pool.request().query("SELECT email FROM Employee");
+  const emails = result.recordset.map((row) => row.email);
+  res.json({ emails });
+});
+
+app.get("/all-courses", async (req,res)=> {
+await poolConnect;
+const result = await pool.request().query("SELECT title from Course");
+const titles = result.recordset.map((row)=> row.title)
+res.json({courses : titles})
+
+
+
+})
 
 
 

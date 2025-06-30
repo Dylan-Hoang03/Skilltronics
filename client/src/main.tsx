@@ -22,6 +22,8 @@ import FullTestPage from "./fulltestpage.tsx";
 import FullLessonPage from "./fulllessonpage.tsx";
 
 import CheckAnswer from "./checkanswer.tsx";
+import ViewOwnScore from "./viewownscore.tsx";
+
 
 import "./index.css";
 
@@ -32,6 +34,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         {/* public routes */}
         <Route path="/" element={<Form />} />
         <Route path="/landingnotadmin" element={<Landingnotadmin />} />
+                <Route path="/viewownscore" element={<ViewOwnScore />} />
+
         <Route path="/taketest" element={<Taketest/>} />
                 <Route path="/takelesson" element={<Takelesson/>} />
 
