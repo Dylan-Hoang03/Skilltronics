@@ -7,7 +7,6 @@ import dotenv from 'dotenv'
 dotenv.config();
 const app = express();
 const port = process.env.PORT;
-import cors from 'cors';
 
 const allowedOrigins = [
   "http://localhost:3000", // for dev
