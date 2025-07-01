@@ -6,17 +6,7 @@ import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
 dotenv.config();
 const app = express();
-const port = process.env.PORT;
-
-const allowedOrigins = [
-  "http://localhost:3000", // for dev
-  "https://your-frontend.onrender.com" // for production
-];
-
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
-}));
+app.use(cors());
 app.use(express.json());
 import stream from 'stream'
 import multer from "multer";
@@ -943,6 +933,6 @@ res.json({courses : titles})
 
 
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+app.listen(5000, () => {
+  console.log('Server is running at http://localhost:5000');
 });
