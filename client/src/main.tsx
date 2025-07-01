@@ -8,6 +8,8 @@ import Landingnotadmin from "./landingnotadmin.tsx";
 import Adduser from "./adduser.tsx";  
 import Addquestion from "./addquestion.tsx";  
 import Addlesson from "./addlesson.tsx";  
+import Chooseadmin from "./chooseadminnotadmin.tsx";  
+
 
 
 import Deleteuser from "./deleteuser.tsx";  
@@ -23,6 +25,7 @@ import FullLessonPage from "./fulllessonpage.tsx";
 
 import CheckAnswer from "./checkanswer.tsx";
 import ViewOwnScore from "./viewownscore.tsx";
+import RequireAuth from "./requireauth.tsx"; // import the new component
 
 
 import "./index.css";
@@ -31,70 +34,127 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
-        {/* public routes */}
-        <Route path="/" element={<Form />} />
-        <Route path="/landingnotadmin" element={<Landingnotadmin />} />
-                <Route path="/viewownscore" element={<ViewOwnScore />} />
+  {/* public route */}
+  <Route path="/" element={<Form />} />
 
-        <Route path="/taketest" element={<Taketest/>} />
-                <Route path="/takelesson" element={<Takelesson/>} />
+  {/* routes that require login */}
+  <Route
+    path="/landingnotadmin"
+    element={
+      <RequireAuth>
+        <Landingnotadmin />
+      </RequireAuth>
+    }
+  />
+  <Route
+    path="/viewownscore"
+    element={
+      <RequireAuth>
+        <ViewOwnScore />
+      </RequireAuth>
+    }
+  />
+  <Route
+    path="/taketest"
+    element={
+      <RequireAuth>
+        <Taketest />
+      </RequireAuth>
+    }
+  />
+  <Route
+    path="/takelesson"
+    element={
+      <RequireAuth>
+        <Takelesson />
+      </RequireAuth>
+    }
+  />
+  <Route
+    path="/test/:courseId"
+    element={
+      <RequireAuth>
+        <FullTestPage />
+      </RequireAuth>
+    }
+  />
+  <Route
+    path="/lesson/:courseId"
+    element={
+      <RequireAuth>
+        <FullLessonPage />
+      </RequireAuth>
+    }
+  />
+  <Route
+    path="/newpassword"
+    element={
+      <RequireAuth>
+        <Updatepassword />
+      </RequireAuth>
+    }
+  />
 
-        <Route path="/test/:courseId" element={<FullTestPage />} />
-                <Route path="/lesson/:courseId" element={<FullLessonPage />} />
+  {/* admin-only routes */}
+  <Route
+    path="/landing"
+    element={
+      <RequireAdmin>
+        <Landing />
+      </RequireAdmin>
+    }
+  />
+  <Route
+    path="/checkanswer"
+    element={
+      <RequireAdmin>
+        <CheckAnswer />
+      </RequireAdmin>
+    }
+  />
 
-         <Route path="/newpassword" element={<Updatepassword />}/>
+    <Route
+    path="/chooseadminnotadmin"
+    element={
+      <RequireAdmin>
+        <Chooseadmin/>
+      </RequireAdmin>
+    }
+  />
+  <Route
+    path="/adduser"
+    element={
+      <RequireAdmin>
+        <Adduser />
+      </RequireAdmin>
+    }
+  />
+  <Route
+    path="/addquestion"
+    element={
+      <RequireAdmin>
+        <Addquestion />
+      </RequireAdmin>
+    }
+  />
+  <Route
+    path="/addlesson"
+    element={
+      <RequireAdmin>
+        <Addlesson />
+      </RequireAdmin>
+    }
+  />
+  <Route
+    path="/deleteuser"
+    element={
+      <RequireAdmin>
+        <Deleteuser />
+      </RequireAdmin>
+    }
+  />
+</Routes>
 
-        {/* protected admin routes */}
-        <Route
-          path="/landing"
-          element={
-            <RequireAdmin>
-              <Landing />
-            </RequireAdmin>
-          }
-        />      
-           <Route
-          path="/checkanswer"
-          element={
-            <RequireAdmin>
-              <CheckAnswer />
-            </RequireAdmin>
-          }
-        />
-        <Route
-          path="/adduser"
-          element={
-            <RequireAdmin>
-              <Adduser />
-            </RequireAdmin>
-          }
-        />
-          <Route
-          path="/addquestion"
-          element={
-            <RequireAdmin>
-              <Addquestion />
-            </RequireAdmin>
-          }
-        />
-          <Route
-          path="/addlesson"
-          element={
-            <RequireAdmin>
-              <Addlesson />
-            </RequireAdmin>
-          }
-        />
-        <Route
-          path="/deleteuser"
-          element={
-            <RequireAdmin>
-              <Deleteuser />
-            </RequireAdmin>
-          }
-        />
-       
-      </Routes>
     </BrowserRouter>
   </React.StrictMode>
 );

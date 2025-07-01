@@ -1,5 +1,4 @@
 import { useState } from "react";
-import logo from "./assets/logo.png"; // adjust the path if needed
 import { useNavigate } from "react-router-dom";
 
 export default function AddUser() {

@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import logo from "./assets/logo.png";
 import { useNavigate } from "react-router-dom";
 
 export default function AddQuestion() {
   const [courseTitle, setCourseTitle] = useState("");
-  const [courseBlurb, setCourseBlurb] = useState("");
+  const [courseBlurb] = useState("");
   const [questionText, setQuestionText] = useState("");
   const [options, setOptions] = useState<string[]>(["", "", "", "", ""]);
   const [correct, setCorrect] = useState<"A" | "B" | "C" | "D" | "E">("A");

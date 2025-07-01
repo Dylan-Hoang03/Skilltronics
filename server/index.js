@@ -6,7 +6,18 @@ import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
 dotenv.config();
 const app = express();
-app.use(cors());
+const port = process.env.PORT;
+import cors from 'cors';
+
+const allowedOrigins = [
+  "http://localhost:3000", // for dev
+  "https://your-frontend.onrender.com" // for production
+];
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
 app.use(express.json());
 import stream from 'stream'
 import multer from "multer";
@@ -802,12 +813,19 @@ app.get("/progress/status",authenticateToken, async (req, res) => {
 
   const canTakeTest = 
     viewedLessons.recordset[0].count === totalLessons.recordset[0].count;
+  const hasPassed = await pool
+  .request()
+  .input("employeeID", sql.Int,employeeID)
+  .input("cid",sql.Int,courseID)
+  .query("SELECT * from ATTEMPT where PASSED = 1");
+
 
   res.json({
     canTakeTest,
     failedLast,
     totalLessons: totalLessons.recordset[0].count,
-    viewedLessons: viewedLessons.recordset[0].count
+    viewedLessons: viewedLessons.recordset[0].count,
+    haspassed: !failedLast
   })
   
   ;}
@@ -926,6 +944,6 @@ res.json({courses : titles})
 
 
 
-app.listen(5000, () => {
-  console.log('Server is running at http://localhost:5000');
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });

@@ -38,7 +38,7 @@ export default function Taketest() {
             return {
               ...course,
                   canTakeTest: progData.canTakeTest ?? false,
-                  hasPassed: progData.hasPassed ?? false,
+                  hasPassed: progData.haspassed,
             };
           })
         );
@@ -96,7 +96,7 @@ courses.map((c) => (
       <span>
         {c.Title}
         {c.hasPassed && (
-          <span className="ml-2 text-green-600 font-semibold">✅</span>
+          <span className="ml-2 text-green-600 font-semibold">PASSED ✅</span>
         )}
       </span>
 

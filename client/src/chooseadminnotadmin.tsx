@@ -1,25 +1,24 @@
 import React from 'react';
 import { useNavigate } from "react-router-dom";
 
-export default function LandingNotAdmin() {
+export default function Chooseadmin() {
   const navigate = useNavigate();
 
   const buttons = [
-    { label: "Take Test", onClick: () => navigate("/taketest") },
-    { label: "View Score", onClick: () => navigate("/viewownscore") },
-    { label: "Review Material", onClick: () => navigate("/takelesson") },
-    { label: "Change Password", onClick: () => navigate("/newpassword") },
+    { label: "Admin", onClick: () => navigate("/landing") },
+    { label: "Not admin", onClick: () => navigate("/landingnotadmin") },
+
   ];
 
   const handleLogout = () => {
-    localStorage.clear(); 
+    localStorage.clear();
     navigate("/");
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-tr from-blue-600 to-white py-12 px-4">
       <h1 className="text-4xl font-bold text-white mb-10">
-        Welcome to eLearning Portal!
+        Welcome to eLearning Portal (Admin)
       </h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-xl">

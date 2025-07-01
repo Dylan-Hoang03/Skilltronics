@@ -12,10 +12,16 @@ export default function Landing() {
     { label: "Add Lessons", onClick: () => navigate("/addlesson") },
   ];
 
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/");
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-start bg-gradient-to-tr from-blue-600 to-white py-12 px-4">
-      <h1 className="text-4xl font-bold text-white mb-10">Welcome to 
-eLearning Portal (Admin)</h1>
+      <h1 className="text-4xl font-bold text-white mb-10">
+        Welcome to eLearning Portal (Admin)
+      </h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-xl">
         {buttons.map((btn, idx) => (
@@ -28,6 +34,14 @@ eLearning Portal (Admin)</h1>
           </button>
         ))}
       </div>
+
+      {/* Logout Button */}
+      <button
+        onClick={handleLogout}
+        className="mt-10 w-full max-w-xl rounded-lg bg-red-600 py-4 px-6 text-white text-lg font-medium shadow hover:bg-red-500 transition"
+      >
+        Logout
+      </button>
     </div>
   );
 }

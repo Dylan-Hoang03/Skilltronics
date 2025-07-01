@@ -37,7 +37,7 @@ export default function Form() {
       alert(`Login successful! Welcome ${data.user.firstName} ${data.user.lastName}`);
 
       if (data.user.isAdmin) {
-        navigate("/landing");
+        navigate("/chooseadminnotadmin");
       } else {
         navigate("/landingnotadmin");
       }
