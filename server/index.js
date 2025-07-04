@@ -236,7 +236,6 @@ app.post('/submit', authenticateToken, async (req, res) => {
       return res.status(401).json({ error: "Employee not found" });
 
     const employeeId = empRS[0].EmployeeID;
-    console.log(employeeId)
 
     const passMark = 0.8;                
     const attemptRS = await pool.request()
@@ -590,6 +589,65 @@ app.get("/queryuser", async (req, res) => {
     return res.status(500).json({ error: "Server error while fetching attempts." });
   }
 });
+app.get("/querybestuser", async (req, res) => {
+  const { email } = req.query;
+  if (!email) {
+    return res.status(400).json({ error: "Missing ?email= parameter" });
+  }
+
+  const normalized = email.toLowerCase().trim();
+  if (!normalized.endsWith("@spartronics.com")) {
+    return res.status(400).json({ error: "E-mail must end with @spartronics.com" });
+  }
+
+  try {
+    await poolConnect;
+
+    const result = await pool
+      .request()
+      .input("email", sql.VarChar, normalized)
+      .query(`
+     WITH MaxScores AS (
+  SELECT 
+    a.CourseID,
+    MAX(a.Score) AS MaxScore
+  FROM Attempt a
+  JOIN Employee e ON e.EmployeeID = a.EmployeeID
+  JOIN AssignedCourse ac ON ac.EmployeeID = e.EmployeeID AND ac.CourseID = a.CourseID
+  WHERE e.Email = 'notadmin@spartronics.com'
+  GROUP BY a.CourseID
+)
+
+SELECT
+  a.AttemptID    AS attemptID,
+  a.AttemptedAt  AS attemptDate,
+  a.Score        AS score,
+  a.Passed       AS isPassed,
+  a.CourseID     AS courseID,
+  c.Title        AS courseTitle,
+  ISNULL(s.totalSeconds, 0) AS totalSeconds
+FROM Attempt a
+JOIN Employee e ON e.EmployeeID = a.EmployeeID
+JOIN AssignedCourse ac ON ac.EmployeeID = e.EmployeeID AND ac.CourseID = a.CourseID
+JOIN Course c ON c.CourseID = a.CourseID
+LEFT JOIN CourseTimeSummary s ON s.employeeID = e.EmployeeID AND s.courseID = a.CourseID
+JOIN MaxScores ms ON ms.CourseID = a.CourseID AND ms.MaxScore = a.Score
+WHERE e.Email = 'notadmin@spartronics.com'
+ORDER BY a.AttemptedAt DESC;
+
+
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ error: "No attempts found for that e-mail." });
+    }
+
+    return res.json({ attempts: result.recordset });
+  } catch (err) {
+    console.error("SQL error on /queryuser:", err);
+    return res.status(500).json({ error: "Server error while fetching attempts." });
+  }
+});
 
 
 const upload = multer({
@@ -883,7 +941,7 @@ app.get("/progress/status", authenticateToken, async (req, res) => {
       `);
     const viewedLessons = viewedLessonsResult.recordset[0].count;
 
-    const canTakeTest = totalLessons > 0 && viewedLessons === totalLessons;
+    const canTakeTest = totalLessons > 0 && viewedLessons >= totalLessons;
 
     // Return status object
     return res.json({
@@ -902,7 +960,6 @@ app.get("/progress/status", authenticateToken, async (req, res) => {
 });
 
 app.post('/changepassword', authenticateToken, async (req, res) => {
-  console.log("pressed")
   const { password, confirmPassword } = req.body;
   const employeeID = req.user?.employeeID;
   console.log(req.user);

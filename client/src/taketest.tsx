@@ -36,6 +36,8 @@ export default function Taketest() {
               { headers: { Authorization: `Bearer ${token}` } }
             );
             const progData = await progRes.json();
+             console.log(progData)
+             console.log(course.CourseID)
             return {
               ...course,
               canTakeTest: progData.canTakeTest ?? false,
@@ -44,7 +46,7 @@ export default function Taketest() {
             };
           })
         );
-
+       
         setCourses(withStatus);
       } catch (err: any) {
         setError(err.message);
@@ -120,6 +122,7 @@ function CourseButton({
   navigate: ReturnType<typeof useNavigate>;
 }) {
   return (
+    
     <button
       className={`w-full text-left px-6 py-4 rounded-lg transition shadow font-medium text-lg ${
         course.hasPassed

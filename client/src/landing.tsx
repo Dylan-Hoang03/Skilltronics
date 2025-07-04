@@ -10,6 +10,7 @@ export default function Landing() {
     { label: "Add Test", onClick: () => navigate("/addquestion") },
     { label: "Add Lessons", onClick: () => navigate("/addlesson") },
      { label: "Assign Course", onClick: () => navigate("/assigncourse") },
+      { label: "Check Assigned Answer", onClick: () => navigate("/checkassignedanswer") },
   ];
   console.log(buttons)
 

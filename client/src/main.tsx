@@ -23,6 +23,8 @@ import Takelesson from "./takelesson.tsx";
 import FullTestPage from "./fulltestpage.tsx";
 import FullLessonPage from "./fulllessonpage.tsx";
 
+import CheckAssignedAnswer from "./checkassignedanswer.tsx";
+
 import CheckAnswer from "./checkanswer.tsx";
 import ViewOwnScore from "./viewownscore.tsx";
 import RequireAuth from "./requireauth.tsx"; // import the new component
@@ -111,6 +113,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     element={
       <RequireAdmin>
         <CheckAnswer />
+      </RequireAdmin>
+    }
+  />
+    <Route
+    path="/checkassignedanswer"
+    element={
+      <RequireAdmin>
+        <CheckAssignedAnswer />
       </RequireAdmin>
     }
   />
