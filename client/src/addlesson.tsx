@@ -1,124 +1,79 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-interface UploadResponse {
-  lessonID: number;
-  message: string;
-}
-
-export default function AddLesson() {
+export default function Assigncourse() {
   const [courseName, setCourseName] = useState("");
-  const [lessonTitle, setLessonTitle] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [employeeEmail, setEmployeeEmail] = useState("");
+
   const [allCourses, setAllCourses] = useState<string[]>([]);
   const [filteredCourses, setFilteredCourses] = useState<string[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [showCourseDropdown, setShowCourseDropdown] = useState(false);
+
+  const [allEmails, setAllEmails] = useState<string[]>([]);
+  const [filteredEmails, setFilteredEmails] = useState<string[]>([]);
+  const [showEmailDropdown, setShowEmailDropdown] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchCourses = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch("http://localhost:5000/all-courses");
-        const data = await res.json();
-        if (Array.isArray(data.courses)) {
-          setAllCourses(data.courses);
-        }
+        const [courseRes, emailRes] = await Promise.all([
+          fetch("http://localhost:5000/all-courses"),
+          fetch("http://localhost:5000/all-users"),
+        ]);
+
+        const courseData = await courseRes.json();
+        const emailData = await emailRes.json();
+
+        if (Array.isArray(courseData.courses)) setAllCourses(courseData.courses);
+        if (Array.isArray(emailData.emails)) setAllEmails(emailData.emails);
       } catch (err) {
-        console.error("Failed to fetch courses:", err);
+        console.error("Error loading data:", err);
       }
     };
-    fetchCourses();
+
+    fetchData();
   }, []);
-
-  const handleCourseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setCourseName(value);
-    const matches = allCourses.filter((c) =>
-      c.toLowerCase().includes(value.toLowerCase())
-    );
-    setFilteredCourses(matches);
-    setShowDropdown(true);
-  };
-
-  const handleSelectCourse = (selected: string) => {
-    setCourseName(selected);
-    setShowDropdown(false);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-
-    const ok =
-      f.type === "video/mp4" ||
-      f.name.toLowerCase().endsWith(".ppt") ||
-      f.name.toLowerCase().endsWith(".pptx") ||
-      f.name.toLowerCase().endsWith(".pdf");
-
-    if (!ok) {
-      alert("Please select an MP4 video or a PowerPoint/PDF file.");
-      e.target.value = "";
-      return;
-    }
-    setFile(f);
-  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!file) {
-      alert("Please choose a file first.");
-      return;
-    }
 
     try {
-      setLoading(true);
-      const form = new FormData();
-      form.append("file", file);
-      form.append("courseName", courseName.trim());
-      form.append("lessonTitle", lessonTitle.trim());
+      const idRes = await fetch(`http://localhost:5000/courseid?name=${encodeURIComponent(courseName)}`);
+      const idData = await idRes.json();
 
-      const res = await fetch("http://localhost:5000/lessons", {
+      if (!idRes.ok || !idData.courseID) {
+        throw new Error(idData.error || "Course not found.");
+      }
+
+      const courseID = idData.courseID;
+
+      const res = await fetch("http://localhost:5000/assigncourse", {
         method: "POST",
-        body: form,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseID, employeeID: employeeEmail }),
       });
 
-      const contentType = res.headers.get("content-type") ?? "";
-      let data: UploadResponse | { error: string };
-      if (contentType.includes("application/json")) {
-        data = await res.json();
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Assignment failed.");
+
+      const assignMore = window.confirm("Course assigned! Assign another?");
+      if (assignMore) {
+        setCourseName("");
+        setEmployeeEmail("");
       } else {
-        const text = await res.text();
-        data = { message: text } as UploadResponse;
-      }
-
-      if (!res.ok) {
-        alert((data as any).error || "Upload failed.");
-        setLoading(false);
-        return;
-      }
-      alert("Worked")
-
-
-      if (window.confirm("Add another question to this course?")) {
-        
-      setCourseName("");
-      setLessonTitle("");
-      setFile(null);
-      setLoading(false);
-      } else {
-        alert("skip lol")
         navigate("/landing");
       }
-    } catch (err) {
-      console.error("Upload error:", err);
-      alert("Network or server error while uploading.");
-      setLoading(false);
+    } catch (err: any) {
+      alert(err.message || "Assignment failed.");
     }
   };
 
   return (
-    <div className="relative h-screen flex items-center justify-center bg-gradient-to-tr from-blue-600 to-white">
+    <div className="relative h-screen flex items-center justify-center bg-gradient-to-tr from-blue-600 to-white px-4">
+      {/* Back Button */}
       <button
         onClick={() => navigate("/landing")}
         className="text-white bg-blue-800 hover:bg-blue-900 px-4 rounded shadow absolute top-4 right-4 h-8 w-auto"
@@ -132,26 +87,37 @@ export default function AddLesson() {
 
       <form
         onSubmit={handleSubmit}
-        className="bg-gray-100 p-8 rounded-xl shadow-xl w-full max-w-3xl space-y-6 relative"
+        className="bg-gray-100 p-8 rounded-xl shadow-xl w-full max-w-xl space-y-6 relative"
       >
-        {/* Course Name with Autocomplete */}
+        {/* Course Name Input */}
         <label className="block relative">
-          <span className="font-medium">Course&nbsp;Name</span>
+          <span className="font-medium">Course Name</span>
           <input
             className="mt-2 p-2 border rounded w-full"
             placeholder="e.g. EMS Orientation"
             value={courseName}
-            onChange={handleCourseChange}
-            onFocus={() => setShowDropdown(true)}
-            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setCourseName(value);
+              const matches = allCourses.filter((c) =>
+                c.toLowerCase().includes(value.toLowerCase())
+              );
+              setFilteredCourses(matches);
+              setShowCourseDropdown(true);
+            }}
+            onFocus={() => setShowCourseDropdown(true)}
+            onBlur={() => setTimeout(() => setShowCourseDropdown(false), 200)}
             required
           />
-          {showDropdown && filteredCourses.length > 0 && (
+          {showCourseDropdown && filteredCourses.length > 0 && (
             <ul className="absolute z-10 bg-white border w-full mt-1 rounded shadow-md max-h-40 overflow-y-auto">
               {filteredCourses.map((c, i) => (
                 <li
                   key={i}
-                  onClick={() => handleSelectCourse(c)}
+                  onClick={() => {
+                    setCourseName(c);
+                    setShowCourseDropdown(false);
+                  }}
                   className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
                 >
                   {c}
@@ -161,46 +127,49 @@ export default function AddLesson() {
           )}
         </label>
 
-        {/* Lesson Title */}
-        <label className="block">
-          <span className="font-medium">Lesson&nbsp;Title</span>
+        {/* Email Input */}
+        <label className="block relative">
+          <span className="font-medium">Employee Email</span>
           <input
             className="mt-2 p-2 border rounded w-full"
-            placeholder="e.g. Trash Can Guid Video"
-            value={lessonTitle}
-            onChange={(e) => setLessonTitle(e.target.value)}
+            placeholder="e.g. jane.doe@example.com"
+            value={employeeEmail}
+            onChange={(e) => {
+              const value = e.target.value;
+              setEmployeeEmail(value);
+              const matches = allEmails.filter((email) =>
+                email.toLowerCase().includes(value.toLowerCase())
+              );
+              setFilteredEmails(matches);
+              setShowEmailDropdown(true);
+            }}
+            onFocus={() => setShowEmailDropdown(true)}
+            onBlur={() => setTimeout(() => setShowEmailDropdown(false), 200)}
             required
           />
-        </label>
-
-        {/* File Upload */}
-        <label className="block">
-          <span className="font-medium">Upload File (MP4 / PPT / PPTX / PDF)</span>
-          <input
-            className="mt-2 block w-full text-sm text-gray-700
-              file:mr-4 file:py-2 file:px-4
-              file:rounded file:border-0
-              file:text-sm file:font-semibold
-              file:bg-blue-50 file:text-blue-700
-              hover:file:bg-blue-100"
-            type="file"
-            accept=".mp4,.ppt,.pptx,.pdf"
-            onChange={handleFileChange}
-            required
-          />
-          {file && (
-            <p className="mt-1 text-sm text-gray-600">
-              Selected: <strong>{file.name}</strong>
-            </p>
+          {showEmailDropdown && filteredEmails.length > 0 && (
+            <ul className="absolute z-10 bg-white border w-full mt-1 rounded shadow-md max-h-40 overflow-y-auto">
+              {filteredEmails.map((email, i) => (
+                <li
+                  key={i}
+                  onClick={() => {
+                    setEmployeeEmail(email);
+                    setShowEmailDropdown(false);
+                  }}
+                  className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
+                >
+                  {email}
+                </li>
+              ))}
+            </ul>
           )}
         </label>
 
         <button
           type="submit"
-          disabled={loading}
-          className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition disabled:opacity-50"
+          className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition"
         >
-          {loading ? "Uploading…" : "Add Lesson"}
+          Assign Course
         </button>
       </form>
     </div>
