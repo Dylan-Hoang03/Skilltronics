@@ -368,6 +368,64 @@ app.get('/courses', async (req, res) => {
     return res.status(500).json({ error: 'Server error during course fetch' });
   }
 });
+app.post("/assigncourse", async (req, res) => {
+  const { courseID, employeeID } = req.body;
+
+  if (!courseID || !employeeID) {
+    return res.status(400).json({ error: "Missing courseID or employeeID" });
+  }
+
+  try {
+    await poolConnect;
+
+    const result = await pool.request()
+      .input("courseID", sql.Int, courseID)
+      .input("employeeID", sql.NVarChar, employeeID) // assuming you're passing email string
+      .query(`
+        INSERT INTO AssignedCourse (employeeID, CourseID)
+        SELECT employeeID, @courseID
+        FROM Employee
+        WHERE Email = @employeeID
+      `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+
+    return res.status(200).json({ message: "Course assigned successfully" });
+  } catch (err) {
+    console.error("Assign error:", err.message);
+    return res.status(500).json({ error: "Server error during course assignment" });
+  }
+});
+
+app.get("/courseid", async (req, res) => {
+  const courseName = req.query.name;
+
+  if (!courseName) {
+    return res.status(400).json({ error: "Missing course name" });
+  }
+
+  try {
+    await poolConnect;
+
+    const result = await pool.request()
+      .input("courseName", sql.NVarChar, courseName)
+      .query("SELECT courseID FROM Course WHERE title = @courseName");
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    const courseID = result.recordset[0].courseID;
+    return res.json({ courseID });
+  } catch (err) {
+    console.error("Course ID fetch error:", err.message);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+
 app.get('/questions/:courseId', authenticateToken, async (req, res) => {
   
   try {
@@ -752,77 +810,97 @@ app.post("/course/view", authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Server error", detail: err.message });
   }
 });
+app.get("/progress/status", authenticateToken, async (req, res) => {
+  try {
+    const employeeEmail = req.user.sub;
+    const courseID = Number(req.query.courseID);
 
-app.get("/progress/status",authenticateToken, async (req, res) => {
-  try{
-      const employeeEmail = req.user.sub;
+    if (!employeeEmail || !courseID) {
+      return res.status(400).json({ error: "Missing input" });
+    }
 
-   await poolConnect;
+    await poolConnect;
 
+    // Get employee ID from email
     const { recordset: empRS } = await pool.request()
       .input('email', sql.NVarChar, employeeEmail)
       .query('SELECT employeeID FROM Employee WHERE Email = @email');
-    
-    if (!empRS.length)
+
+    if (!empRS.length) {
       return res.status(401).json({ error: "Employee not found" });
+    }
 
     const employeeID = empRS[0].employeeID;
-  const courseID = Number(req.query.courseID);
 
-  if (!employeeID || !courseID) return res.status(400).json({ error: "Missing input" });
+    // Get the most recent attempt (if any)
+    const lastAttemptResult = await pool.request()
+      .input("uid", sql.Int, employeeID)
+      .input("cid", sql.Int, courseID)
+      .query(`
+        SELECT TOP 1 Passed
+        FROM Attempt
+        WHERE employeeID = @uid AND CourseID = @cid
+        ORDER BY AttemptedAt DESC
+      `);
 
-  await poolConnect;
+    const lastAttempt = lastAttemptResult.recordset[0];
+    const failedLast = lastAttempt?.Passed === false;
 
-  // Check if user failed last attempt
-  const lastAttempt = await pool
-    .request()
-    .input("uid", sql.Int, employeeID)
-    .input("cid", sql.Int, courseID)
-    .query(`
-      SELECT TOP 1 Passed
-      FROM Attempt
-      WHERE employeeID = @uid AND CourseID = @cid
-      ORDER BY AttemptedAt DESC
-    `);
+    // Check if user has passed this course
+    const hasPassedResult = await pool.request()
+      .input("employeeID", sql.Int, employeeID)
+      .input("cid", sql.Int, courseID)
+      .query(`
+        SELECT TOP 1 * FROM Attempt
+        WHERE employeeID = @employeeID AND CourseID = @cid AND Passed = 1
+      `);
 
-  const failedLast = lastAttempt.recordset[0]?.Passed === false;
+    const hasPassed = hasPassedResult.recordset.length > 0;
 
-  // Count total lessons
-  const totalLessons = await pool
-    .request()
-    .input("cid", sql.Int, courseID)
-    .query("SELECT COUNT(*) AS count FROM Lesson WHERE CourseID = @cid");
-
-  // Count lessons viewed
-  const viewedLessons = await pool
-    .request()
-    .input("uid", sql.Int, employeeID)
-    .input("cid", sql.Int, courseID)
-    .query("SELECT COUNT(*) AS count FROM Progress WHERE employeeID = @uid AND CourseID = @cid AND Viewed = 1");
-
-  const canTakeTest = 
-    viewedLessons.recordset[0].count === totalLessons.recordset[0].count;
-  const hasPassed = await pool
-  .request()
-  .input("employeeID", sql.Int,employeeID)
-  .input("cid",sql.Int,courseID)
-  .query("SELECT * from ATTEMPT where PASSED = 1");
+    const hasAssignedResult = await pool.request()
+    .input("employeeID",sql.Int,employeeID)
+    .input("cid",sql.Int,courseID)
+    .query('SELECT TOP 1 * FROM ASSIGNEDCOURSE WHERE employeeID = @employeeID and CourseID = @cid'
+    );
+    const isAssigned = hasAssignedResult.recordset.length > 0;
 
 
-  res.json({
-    canTakeTest,
-    failedLast,
-    totalLessons: totalLessons.recordset[0].count,
-    viewedLessons: viewedLessons.recordset[0].count,
-    haspassed: !failedLast
-  })
-  
-  ;}
-  catch(err){
-     console.error("Database error:", err); // log actual error
+    // Count total lessons in the course
+    const totalLessonsResult = await pool.request()
+      .input("cid", sql.Int, courseID)
+      .query(`
+        SELECT COUNT(*) AS count FROM Lesson WHERE CourseID = @cid
+      `);
+    const totalLessons = totalLessonsResult.recordset[0].count;
+
+    // Count viewed lessons for this user
+    const viewedLessonsResult = await pool.request()
+      .input("uid", sql.Int, employeeID)
+      .input("cid", sql.Int, courseID)
+      .query(`
+        SELECT COUNT(*) AS count FROM Progress
+        WHERE employeeID = @uid AND CourseID = @cid AND Viewed = 1
+      `);
+    const viewedLessons = viewedLessonsResult.recordset[0].count;
+
+    const canTakeTest = totalLessons > 0 && viewedLessons === totalLessons;
+
+    // Return status object
+    return res.json({
+      canTakeTest,
+      haspassed: hasPassed,
+      failedLast,
+      totalLessons,
+      viewedLessons,
+      isAssigned
+    });
+
+  } catch (err) {
+    console.error("Database error:", err);
     res.status(500).json({ error: "Server error", detail: err.message });
   }
 });
+
 app.post('/changepassword', authenticateToken, async (req, res) => {
   console.log("pressed")
   const { password, confirmPassword } = req.body;

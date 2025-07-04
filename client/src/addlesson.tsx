@@ -97,12 +97,19 @@ export default function AddLesson() {
         setLoading(false);
         return;
       }
+      alert("Worked")
 
+
+      if (window.confirm("Add another question to this course?")) {
+        
       setCourseName("");
       setLessonTitle("");
       setFile(null);
       setLoading(false);
-      navigate("/landing");
+      } else {
+        alert("skip lol")
+        navigate("/landing");
+      }
     } catch (err) {
       console.error("Upload error:", err);
       alert("Network or server error while uploading.");

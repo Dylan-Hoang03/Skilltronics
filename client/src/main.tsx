@@ -26,6 +26,8 @@ import FullLessonPage from "./fulllessonpage.tsx";
 import CheckAnswer from "./checkanswer.tsx";
 import ViewOwnScore from "./viewownscore.tsx";
 import RequireAuth from "./requireauth.tsx"; // import the new component
+import Assigncourse from "./assigncourse.tsx"; // import the new component
+
 
 
 import "./index.css";
@@ -134,6 +136,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     element={
       <RequireAdmin>
         <Addquestion />
+      </RequireAdmin>
+    }
+  />\
+    <Route
+    path="/assigncourse"
+    element={
+      <RequireAdmin>
+        <Assigncourse />
       </RequireAdmin>
     }
   />

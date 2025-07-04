@@ -9,7 +9,9 @@ export default function Landing() {
     { label: "Delete User", onClick: () => navigate("/deleteuser") },
     { label: "Add Test", onClick: () => navigate("/addquestion") },
     { label: "Add Lessons", onClick: () => navigate("/addlesson") },
+     { label: "Assign Course", onClick: () => navigate("/assigncourse") },
   ];
+  console.log(buttons)
 
   const handleLogout = () => {
     localStorage.clear();
